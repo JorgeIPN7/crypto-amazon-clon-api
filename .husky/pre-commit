@@ -1,0 +1,7 @@
+# `--relative` no es cosmético: lint-staged pasa rutas ABSOLUTAS por defecto y en Windows la
+# línea de comandos tope son 8191 caracteres. Con ~70 archivos staged (un refactor, una
+# migración grande) el prefijo `C:\Users\...\_nest-base-template\` de cada ruta desborda ese
+# límite y las tareas mueren con «La línea de comandos es demasiado larga» — un fallo del
+# entorno que parece un fallo del código. Las rutas relativas ahorran ~55 caracteres cada una.
+pnpm exec lint-staged --relative
+pnpm exec tsc --noEmit

@@ -1,0 +1,84 @@
+name: Security
+
+# Complementa el hook local de secretlint (backlog #6), no lo sustituye: el hook solo ve archivos
+# staged en el commit actual y `git commit --no-verify` lo salta por completo; este workflow no
+# tiene ese atajo.
+#
+# ⚠️ Lo que NO hace, escrito aquí porque la versión anterior de esta cabecera afirmaba lo
+# contrario: gitleaks **no escanea el historial completo en `push` ni en `pull_request`**. Son dos
+# cosas distintas y es fácil fundirlas en una — `fetch-depth: 0` hace el historial DISPONIBLE, pero
+# el rango lo elige la action por su cuenta. En el fuente del SHA pineado añade `--log-opts` con un
+# rango de commits para `push` (a menudo `-1`, un solo commit) y para `pull_request`, y **no hay
+# rama `else`**: solo `schedule` y `workflow_dispatch` caen al barrido completo. Es decir, cazar un
+# secreto que entró antes de que existiera el gate local depende del cron semanal o de un disparo
+# manual, NUNCA del siguiente PR.
+#
+# `workflow_dispatch` está en la lista justamente por eso: sin él no había escotilla manual para el
+# único modo que mira hacia atrás.
+#
+# Licencia: gitleaks-action es gratuito en repositorios personales. En repositorios de organización
+# requiere `GITLEAKS_LICENSE` como secret — documentado aquí, no configurado: se añade el día que
+# el repo pase a vivir bajo una organización.
+#
+# Actions pineadas por SHA — política y cómo bumpear: ver el comentario de cabecera de ci.yml.
+#
+# ⚠️ Ese pin cubre menos de lo que aparenta y conviene tenerlo escrito: el SHA fija el WRAPPER de
+# JavaScript, pero el binario que de verdad escanea se descarga en tiempo de ejecución desde una
+# release de GitHub, se mete en el PATH y se cachea — sin checksum ni firma. El pin no protege lo
+# que ejecuta. Cerrar ese hueco exigiría sustituir la action por un step propio que descargue y
+# verifique; queda como límite conocido, no resuelto. Lo que sí se hace es fijar la versión abajo
+# en vez de heredar el default hardcodeado de la action (8.24.3, de marzo de 2025), porque con ese
+# default las reglas que gitleaks añadió upstream desde entonces no llegan a correr nunca.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Semanal y no solo en push/PR, por dos motivos que se refuerzan: (1) una regla nueva de
+    # gitleaks (o un cambio en su allowlist) solo se re-evalúa contra el historial ya existente si
+    # algo dispara un escaneo — sin cron, una regla añadida hoy jamás miraría hacia atrás por sí
+    # sola; (2) como explica la cabecera, este cron es uno de los dos únicos triggers que recorren
+    # el historial entero.
+    - cron: '17 4 * * 1'
+
+# ⚠️ `github.event_name` en la clave no es decorativo. Para un evento `schedule`, `GITHUB_REF` es
+# la rama por defecto —`refs/heads/main`, idéntico a un push a main—, así que sin discriminador el
+# cron de las 04:17 y un merge a las 04:19 caen en el MISMO grupo y `cancel-in-progress` mata el
+# barrido completo a media ejecución. Los runs cancelados no se reintentan y el siguiente cron es
+# una semana después: se perdería justo el único escaneo del historial, y el síntoma sería un job
+# cancelado que nadie mira. (Los PR viven en `refs/pull/<n>/merge`, así que la colisión real era
+# solo push-contra-cron.)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Gitleaks (historial completo solo en cron y manual)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (historial completo)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Los comentarios en el PR vienen ACTIVADOS por defecto y llaman a
+          # `pulls.createReviewComment`, que exige `pull-requests: write`. Con `contents: read`
+          # cada comentario da 403 y cae en un `catch` cuyo mensaje culpa al tamaño del diff —
+          # un diagnóstico equivocado que manda a buscar donde no es. Se apagan en vez de ampliar
+          # el permiso: el job ya se pone rojo, el hallazgo sigue estando en el resumen y en el
+          # artefacto, y este workflow —el único que clona el repositorio ENTERO— se queda en solo
+          # lectura. En una plantilla pública además evita publicar la ubicación exacta del
+          # secreto en un comentario.
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+          # Explícita a propósito, no heredada; el porqué está en el aviso de la cabecera.
+          GITLEAKS_VERSION: '8.30.1'

@@ -1,0 +1,21 @@
+# Configuración del selector de plantillas de issue.
+#
+# `blank_issues_enabled: false` obliga a pasar por una de las dos plantillas. Sin eso, el
+# «Open a blank issue» sigue disponible y los formularios se vuelven opcionales: la mitad de
+# los reportes llegan sin versión de Node, sin la salida del gate y sin decir si la base
+# estaba levantada, que es justo lo que las plantillas existen para pedir.
+#
+# No hay enlace a Discussions a propósito. GitHub Discussions solo está disponible en
+# repositorios públicos y en los privados de una organización con Team/Enterprise; este
+# repositorio nace privado y bajo una cuenta personal (ver `docs/backlog.md` §6), así que el
+# enlace apuntaría a una pestaña que no existe. Se añade el día que se cumpla la condición.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Reportar una vulnerabilidad (en privado)
+    url: https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/security/advisories/new
+    about: Los fallos de seguridad NO se reportan como issue público. Usa el aviso privado de GitHub; la política completa está en SECURITY.md.
+
+  - name: Trabajo ya aplazado, con su decisión escrita
+    url: https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/blob/main/docs/backlog.md
+    about: El backlog es el gestor de incidencias real del repositorio. Registra qué se aplazó y por qué, y también lo que se cerró tras verificar que no era un problema. Léelo antes de abrir un issue.

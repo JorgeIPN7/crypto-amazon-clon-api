@@ -1,0 +1,24 @@
+node_modules
+dist
+coverage
+.git
+.github
+.husky
+.claude
+docs
+infra
+*.tsbuildinfo
+.swc
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+pnpm-debug.log*
+Dockerfile
+docker-compose*.yml
+README.md
+CLAUDE.md
+
+# El bundle de Scalar se regenera en el build stage (hook prebuild); enviarlo en el contexto
+# son ~5,5 MB de transferencia inutil.
+public

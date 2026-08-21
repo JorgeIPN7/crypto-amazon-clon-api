@@ -1,0 +1,26 @@
+{
+  "version": "1.2.0",
+  "organization": "NestJS Best Practices",
+  "author": "Kadajett",
+  "license": "MIT",
+  "date": "April 2026",
+  "nestVersion": "11.x",
+  "abstract": "Comprehensive best practices and architecture guide for NestJS applications, aligned with NestJS 11 (Express v5 / Fastify v5, Node.js 20+, cache-manager v6 / Keyv, BullMQ WorkerHost, reverse-order termination hooks). Designed for AI agents and LLMs. Contains 45 rules across 10 categories, prioritized by impact from critical (architecture, dependency injection) to incremental (DevOps patterns). Each rule includes a brief explanation, an incorrect example, a correct example, and explicit notes for v11-specific behavior where applicable.",
+  "references": [
+    "[NestJS Documentation](https://docs.nestjs.com)",
+    "[NestJS 11 Migration Guide](https://docs.nestjs.com/migration-guide)",
+    "[NestJS Lifecycle Events](https://docs.nestjs.com/fundamentals/lifecycle-events)",
+    "[NestJS Injection Scopes (incl. Durable Providers)](https://docs.nestjs.com/fundamentals/injection-scopes)",
+    "[NestJS Caching (cache-manager v6 / Keyv)](https://docs.nestjs.com/techniques/caching)",
+    "[NestJS Queues (BullMQ)](https://docs.nestjs.com/techniques/queues)",
+    "[NestJS Validation](https://docs.nestjs.com/techniques/validation)",
+    "[NestJS Configuration](https://docs.nestjs.com/techniques/configuration)",
+    "[NestJS Logger](https://docs.nestjs.com/techniques/logger)",
+    "[NestJS Versioning](https://docs.nestjs.com/techniques/versioning)",
+    "[NestJS Microservices](https://docs.nestjs.com/microservices/basics)",
+    "[NestJS Terminus (Health Checks)](https://docs.nestjs.com/recipes/terminus)",
+    "[NestJS Security — Helmet](https://docs.nestjs.com/security/helmet)",
+    "[NestJS Security — CSRF (csrf-csrf)](https://docs.nestjs.com/security/csrf)",
+    "[NestJS Throttler](https://docs.nestjs.com/security/rate-limiting)"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  // VS Code las ofrece al abrir el proyecto. Ninguna es obligatoria para compilar ni para
+  // pasar el Definition of Done: las comprobaciones reales viven en los scripts de
+  // `package.json` y en la CI, no en el editor.
+  "recommendations": [
+    // Marca los errores de ESLint mientras escribes, con las mismas reglas de
+    // `eslint.config.mjs` que aplica `pnpm lint:check`.
+    "dbaeumer.vscode-eslint",
+    // Formatea con la configuración de `.prettierrc`, la misma que verifica `pnpm format:check`.
+    "esbenp.prettier-vscode",
+    // El corrector ortográfico al que da servicio `cSpell.language` de `settings.json`. Sin él,
+    // esa configuración no hace nada; con él y sin ella, marca todo el español.
+    "streetsidesoftware.code-spell-checker",
+    // Diccionario español para el anterior. La extensión base solo trae inglés: sin este
+    // paquete, poner `es` en `cSpell.language` no cambia nada.
+    "streetsidesoftware.code-spell-checker-spanish",
+    // Respeta `.editorconfig`, que fija UTF-8, LF y la indentación.
+    "editorconfig.editorconfig"
+  ]
+}

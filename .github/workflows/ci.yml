@@ -1,0 +1,268 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Cadena de suministro (backlog #6): todas las actions de este archivo se referencian por
+# SHA de commit, nunca por tag. Un tag es mutable —puede re-apuntarse a otro commit sin
+# aviso, la superficie del ataque conocido como "tag-retargeting"— un SHA no. El tag legible
+# viaja como comentario (`# v5`) solo para que un humano sepa qué versión es sin tener que
+# resolver el SHA a mano. Al bumpear una action: verificar el SHA nuevo contra la API de
+# GitHub o la página de releases del repo upstream, nunca copiarlo de un README de terceros.
+#
+# ⚠️ Al resolver ese SHA por API, `git/ref/tags/<tag>` NO siempre devuelve un commit. Si el tag
+# es ANOTADO, `object.type` vale `"tag"` y `object.sha` identifica al objeto tag, no al commit
+# que hay debajo; hay que dar un salto más por `git/tags/<sha>` para obtenerlo. Anotar o no es
+# una decisión POR TAG de quien publica, no una propiedad del repositorio, así que la única
+# respuesta fiable es mirar `object.type` en cada bump — no fiarse de cómo salió la vez anterior
+# ni de esta lista, que es una foto del 2026-08-19 y no una regla:
+#
+#   anotados (doble salto):  pnpm/action-setup@v6.0.10        ff378ebe → 0977fd99
+#                            aquasecurity/trivy-action@v0.36.0  a9c7b0f0 → ed142fd0
+#   ligeros  (salto único):  actions/checkout@v7.0.1, actions/setup-node@v7.0.0,
+#                            actions/upload-artifact@v7.0.1, gitleaks/gitleaks-action@v3.0.0
+#
+# Los seis se reverificaron contra la API el 2026-08-19 y los seis SHA de abajo y de
+# `security.yml` coinciden. Equivocarse aquí no da un error legible: el runner no resuelve la
+# action.
+#
+# ⚠️ Lo que sí estaba mal hasta esa fecha eran las ETIQUETAS de esta lista, no los pines: decía
+# `checkout@v5` y `setup-node@v5` cuando `93923d3` y `22ae48e` ya los habían movido a v7.0.1 y
+# v7.0.0. No es cosmético — este bloque ES el procedimiento para resolver el SHA siguiente, así
+# que quien siguiera la tabla anotado/ligero equivocada resolvería el objeto que no es, y el
+# síntoma es el que dice la línea de arriba. Cada bump reescribe este bloque, no solo la línea
+# del `uses:`.
+#
+# Bump del 2026-08-14, motivo común: GitHub anunció la retirada de Node 20 en los runners
+# (aviso «Node.js 20 is deprecated … forced to run on Node.js 24»). El runtime lo declara el
+# AUTOR de cada action en su `runs.using`, no lo elige quien la consume: ni `.nvmrc` ni
+# `setup-node` influyen, porque esos gobiernan los steps `run:` de este repo, no el proceso con
+# que el runner arranca una action ajena. Por eso el arreglo solo puede ser subir de versión.
+# `pnpm/action-setup` v4→v6.0.10 (v5 pasó a node24, v6 añadió soporte a pnpm v11, que es
+# justo el que pinea `packageManager`) y `upload-artifact` v4→v7.0.1 (v6 exige runner ≥2.327.1,
+# de sobra en los hosted). `checkout` y `setup-node` no aparecían en aquel aviso porque ya eran
+# node24; se movieron después, por su cuenta, a v7.0.1 y v7.0.0. `gitleaks-action` v2→v3.0.0 en
+# security.yml, por lo mismo.
+
+jobs:
+  quality:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    # La suite E2E se ejecuta contra PostgreSQL real (el skill prohíbe mockear el ORM
+    # en los tests de persistencia), así que el job necesita una base de verdad.
+    services:
+      postgres:
+        image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nest_base_template
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d nest_base_template"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_DATABASE: nest_base_template
+      DB_SCHEMA: public
+      DB_SSL: 'false'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      # ⚠️ `--trust-lockfile` no es una optimización de tiempo. Sin él, pnpm 11 REAPLICA el
+      # cooldown de `minimumReleaseAge` —24 h por defecto, no configurado en ningún archivo de
+      # este repo— a cada entrada del lockfile en CADA install, así que un paquete publicado hace
+      # menos de 24 h pone los DOS jobs de este archivo en rojo con
+      # `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` aunque el lockfile sea coherente byte a byte. Es
+      # el fallo que obligó a `b79372b` a llevar un embargo de reloj en el mensaje de commit y a
+      # fusionar el lockfile a mano. El flag existe exactamente para esto —`pnpm install --help`:
+      # «CI runs against an already-verified lockfile»—.
+      #
+      # El cooldown NO desaparece del proyecto, cambia de sitio: lo aplica Renovate aguas arriba
+      # con `minimumReleaseAge: 3 days` en `renovate.json`, ANTES de abrir la PR. Las dos mitades
+      # son una sola decisión: quitar cualquiera de ellas deja un hueco —sin el flag, la CI se pone
+      # roja sin causa real; sin la regla de Renovate, nadie verifica el cooldown en ningún punto—.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --trust-lockfile
+
+      # Gate de cadena de suministro (backlog #6): CVEs high+ en dependencias de
+      # PRODUCCIÓN rompen la CI. Las de dev no llegan a la imagen (--prod).
+      # Va justo tras el install: falla rápido, antes de gastar minutos en tests.
+      - name: Audit de dependencias de producción
+        run: pnpm audit --prod --audit-level=high
+
+      # El override `swagger-ui-dist: '-'` de pnpm-workspace.yaml retira 12 MB de assets que
+      # Scalar hace innecesarios. Que aplicó no puede darse por hecho: hasta pnpm 11 el mismo
+      # ajuste vivía en el key `pnpm` de package.json, que ahora se ignora EN SILENCIO.
+      #
+      # Se comprueba el enlace desde `@nestjs/swagger`, no la presencia en `node_modules/.pnpm`.
+      # Ahí puede quedar un directorio huérfano de una instalación anterior aunque el override
+      # funcione: buscarlo daría un falso positivo en local y verde en CI, que es la peor
+      # combinación posible para un gate.
+      #
+      # El control positivo va primero y no es adorno. Un glob que no encuentra nada da verde
+      # tanto si el override aplicó como si la ruta dejó de existir —otra versión de pnpm,
+      # `node-linker=hoisted`, un rename del layout—, y entonces el gate estaría afirmando algo
+      # que no ha llegado a mirar. Comprobar antes que el paquete SÍ está donde se espera
+      # convierte «no pude comprobar» en rojo, que es el único color honesto para ese caso.
+      - name: Verificar que swagger-ui-dist sigue fuera del arbol
+        run: |
+          if ! compgen -G "node_modules/.pnpm/@nestjs+swagger@*/node_modules/@nestjs/swagger" > /dev/null; then
+            echo "Control positivo fallido: @nestjs/swagger no está donde este gate lo busca."
+            echo "El layout de pnpm cambió, así que la comprobación de abajo no probaría nada."
+            exit 1
+          fi
+          if compgen -G "node_modules/.pnpm/@nestjs+swagger@*/node_modules/swagger-ui-dist" > /dev/null; then
+            echo "swagger-ui-dist volvió al árbol: el override de pnpm-workspace.yaml no aplicó."
+            exit 1
+          fi
+          echo "OK: @nestjs/swagger existe y no puede resolver swagger-ui-dist."
+
+      - name: Lint
+        run: pnpm lint:check
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test:ci
+
+      # El servicio de Postgres no ejecuta `docker/initdb/`, así que la base de tests se
+      # crea aquí a mano. En local la crea el init script al levantar el contenedor.
+      - name: Create test database
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE nest_base_template_test'
+
+      # Las migraciones se aplican a la base de tests, que es contra la que corren los E2E.
+      - name: Run migrations
+        run: pnpm migration:run
+        env:
+          DB_DATABASE: nest_base_template_test
+
+      - name: E2E tests
+        run: pnpm test:e2e:ci
+
+      - name: Build
+        run: pnpm build
+
+      # Nadie construía la imagen, así que un fallo del stage de producción —como el hook
+      # `prepare: husky` corriendo bajo `--prod`— solo aparecía al desplegar.
+      #
+      # `--pull` no es rutina: el `apk upgrade` del Dockerfile solo vuelve a correr si su capa se
+      # invalida, y la clave de caché de un `RUN` es la CADENA LITERAL de la instrucción — que no
+      # cambia nunca. Sin `--pull`, un build tibio (una máquina local, un runner self-hosted, un
+      # `--cache-from` futuro) reutiliza la capa parcheada el día que se construyó por primera vez
+      # y encima ni re-baja el tag base. El gate escanearía una imagen distinta de la que se
+      # despliega, y la divergencia crece con la edad de la caché. En los runners hosted siempre
+      # está frío, que es exactamente lo que lo esconde.
+      - name: Docker build
+        run: docker build --pull -t nest-base-template:ci .
+
+      # Gate de cadena de suministro (backlog #6): CVEs HIGH/CRITICAL CON FIX
+      # disponible en la imagen rompen la CI. ignore-unfixed mantiene el gate
+      # accionable: rojo solo cuando hay algo que hacer (decisión del spec §3.2).
+      # El scan también detecta secretos horneados en layers — superficie
+      # complementaria al hook local, que solo ve archivos staged.
+      - name: Scan de la imagen (trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: nest-base-template:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      # Las DOS suites producen cobertura y en directorios distintos: `jest.config.mjs` escribe en
+      # `coverage/` y `test/jest-e2e.config.mjs` en `coverage-e2e/`. Subir solo el primero es
+      # justamente perder el que hace falta: el informe E2E es el ÚNICO que mide `*.module.ts` y
+      # `*.typeorm.repository.ts` —los archivos que la suite unitaria excluye a propósito, con su
+      # propio umbral—, así que cuando rompa ese umbral, quien baje el artefacto se encontraría con
+      # el informe unitario, que por construcción no contiene ninguno de esos archivos.
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: |
+            coverage
+            coverage-e2e
+          if-no-files-found: ignore
+
+  # El auditor del modelo «casos primero» deja de ser una corrida manual por ciclo y pasa a
+  # ser gate (backlog #9): `thresholds.break: 85` en stryker.config.mjs rompe este job si el
+  # score global cae. Va en un job APARTE del de calidad, no como un step más, por tres
+  # razones: (1) no necesita PostgreSQL —`mutate` cubre solo domain/ y application/, que se
+  # ejercitan con la config unitaria—, así que arrastrar el servicio sería puro coste;
+  # (2) tarda minutos y en un job propio corre en paralelo con el resto en vez de retrasar
+  # el feedback rápido de lint/typecheck; (3) merece su propio timeout, más holgado.
+  mutation:
+    name: Mutación (auditor de casos)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      # `--trust-lockfile`: el porqué está en el install del job `quality`. Va aquí también
+      # porque este job empieza por el mismo install y se pondría rojo por su cuenta.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --trust-lockfile
+
+      - name: Mutation testing
+        run: pnpm test:mutation
+
+      # El HTML es lo único que hace accionable un rojo: lista cada mutante superviviente con
+      # su diff. Sin él, el fallo solo dice un porcentaje. `if: always()` porque el caso en
+      # que más se necesita es justamente cuando el step anterior falló.
+      - name: Upload reporte de mutación
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-report
+          path: reports/mutation
+          if-no-files-found: ignore

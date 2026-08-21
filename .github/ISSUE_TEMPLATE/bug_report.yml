@@ -1,0 +1,164 @@
+name: Reporte de fallo
+description: Algo de la plantilla no hace lo que dice su documentación.
+title: 'fix: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportarlo. Antes de rellenar nada, dos comprobaciones que ahorran tiempo a
+        todos:
+
+        - **¿Es una vulnerabilidad?** No la publiques aquí. Lee
+          [`SECURITY.md`](https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/blob/main/SECURITY.md)
+          y repórtala en privado.
+        - **¿Está ya decidido?**
+          [`docs/backlog.md`](https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/blob/main/docs/backlog.md)
+          es el gestor de incidencias real de este repositorio y registra el trabajo aplazado
+          **con su criterio**, además de lo que se cerró tras verificar que no era un problema.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Antes de abrirlo
+      options:
+        - label: No es una vulnerabilidad de seguridad (esas van por `SECURITY.md`, en privado).
+          required: true
+        - label: Busqué en `docs/backlog.md` y esto no está ya registrado con una decisión.
+          required: true
+
+  - type: dropdown
+    id: origin
+    attributes:
+      label: ¿El fallo es de la plantilla o de un proyecto derivado?
+      description: >-
+        Es la primera pregunta que se hace al triar. Un fallo reproducible sobre un clon limpio
+        de `main` es un fallo de la plantilla; uno que solo aparece sobre código añadido después
+        casi nunca lo es, y se tria distinto.
+      options:
+        - Plantilla — reproducible sobre un clon limpio de `main`, sin cambios
+        - Proyecto derivado — el repo se copió y se modificó; no lo he reproducido en limpio
+        - No lo sé todavía
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Qué pasa
+      description: >-
+        Qué esperabas y qué observaste, en ese orden. Si lo que falla contradice algo escrito en
+        `README.md` o `CLAUDE.md`, cita la línea: la contradicción es la mitad del reporte.
+      placeholder: |
+        Esperaba que ... porque el README dice ...
+        En su lugar ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Cómo reproducirlo
+      description: Desde un clon limpio, si es posible. Comandos exactos, no descripciones.
+      placeholder: |
+        1. pnpm install
+        2. pnpm db:up
+        3. pnpm migration:run
+        4. pnpm test:e2e
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: gate
+    attributes:
+      label: ¿Qué gate falló?
+      description: >-
+        La Definition of Done del repo es `typecheck` → `lint:check` → `format:check` → `test`
+        → `test:e2e` → `build`. Saber cuál se rompió acota el problema antes de leer una línea
+        de log.
+      options:
+        - pnpm typecheck
+        - pnpm lint:check
+        - pnpm format:check
+        - pnpm test (unitarios)
+        - pnpm test:e2e
+        - pnpm test:mutation
+        - pnpm build
+        - Ninguno — todos los gates están verdes y el fallo es en ejecución
+        - El arranque de la aplicación (`pnpm start:dev`)
+        - Otro (dilo en la salida de abajo)
+    validations:
+      required: true
+
+  - type: textarea
+    id: gate-output
+    attributes:
+      label: Salida del gate que falló
+      description: >-
+        Pégala completa, no solo la última línea. Si es enorme, el bloque de error más el
+        comando que lo produjo. **Revísala antes de pegarla**: no debe llevar secretos, tu
+        `.env`, ni `JWT_SECRET`.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: db
+    attributes:
+      label: ¿Estaba PostgreSQL levantado?
+      description: >-
+        `pnpm test:e2e` y cualquier ruta que toque la base la necesitan. Es la causa número uno
+        de los fallos que se reportan como bug — y `ECONNREFUSED 127.0.0.1:5432` no siempre es
+        la primera línea del error.
+      options:
+        - 'Sí: `pnpm db:up` levantado y `pnpm migration:run` ejecutado'
+        - 'Sí, levantado, pero NO había ejecutado `pnpm migration:run`'
+        - 'No, no estaba levantado'
+        - 'No aplica: el fallo no toca la base de datos'
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Versión de Node
+      description: >-
+        Salida de `node --version`. El repo fija `24.19.0` en `.nvmrc`, pero `engines` **no
+        bloquea la instalación**: con otra versión pnpm solo avisa y sigue.
+      placeholder: v24.19.0
+    validations:
+      required: true
+
+  - type: input
+    id: pnpm
+    attributes:
+      label: Versión de pnpm
+      description: >-
+        Salida de `pnpm --version`. El repo fija `11.22.0` en `packageManager`; sin
+        `corepack enable` tu pnpm global puede ser otro.
+      placeholder: 11.22.0
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Sistema operativo
+      description: El entorno de referencia del repo es Windows; hay diferencias reales (rutas, variables de entorno en scripts).
+      placeholder: Windows 11 / macOS 15 / Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit o rama
+      description: Salida de `git rev-parse --short HEAD`. Hoy no hay releases ni tags, así que el commit es la única referencia de versión.
+      placeholder: fcaebc0
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Cualquier otra cosa
+      description: Variables de entorno relevantes (sin sus valores secretos), capturas, un test que falle.

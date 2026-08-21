@@ -1,0 +1,103 @@
+name: Propuesta de mejora
+description: Algo que la plantilla debería resolver y hoy no resuelve.
+title: 'feat: '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Este repositorio es una **plantilla base para un monolito modular**, no un framework. El
+        listón para añadir una pieza es que resuelva un problema que casi todo proyecto derivado
+        va a tener; lo que solo sirve para un caso concreto se queda fuera a propósito.
+
+        Antes de escribir, dos lecturas que probablemente contienen ya la respuesta:
+
+        - [`docs/backlog.md`](https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/blob/main/docs/backlog.md)
+          — el trabajo aplazado **con su criterio ya decidido**, y la sección «Cerrado al
+          verificarlo», que registra lo que se descartó para que nadie lo reinvestigue
+          (OpenTelemetry, circuit breakers, feature flags, testcontainers).
+        - `README.md` §«Tecnologías evaluadas y descartadas» — propuestas con veredicto escrito.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Antes de abrirla
+      options:
+        - label: Leí `docs/backlog.md` y esto no está ya registrado con una decisión o un trigger.
+          required: true
+        - label: Leí `README.md` §«Tecnologías evaluadas y descartadas» y esto no está descartado ahí.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qué problema resuelve
+      description: >-
+        El problema, no la solución. Si el problema ya te ocurrió en un proyecto real, cuenta
+        cómo — un caso concreto pesa más que una buena idea abstracta.
+      placeholder: |
+        Al desplegar la plantilla en ... me encontré con que ...
+        Hoy hay que resolverlo a mano haciendo ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Qué propones
+      description: Qué entraría al repositorio, y qué archivos tocaría si ya lo sabes.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Alcance
+      description: >-
+        Determina qué proceso sigue. Todo lo que lleve lógica en `domain/` o `application/`
+        necesita la tabla de «Casos acordados» del modelo de colaboración antes de escribir
+        código; el tooling, la infra y la documentación están exentos.
+      options:
+        - Bounded context o caso de uso nuevo (lleva tabla de casos)
+        - Regla de arquitectura o de lint (toca `eslint.boundaries.js` / `eslint.config.mjs`)
+        - Tooling, build o dependencias
+        - CI, cadena de suministro o seguridad
+        - Documentación
+        - Otro
+    validations:
+      required: true
+
+  - type: dropdown
+    id: breaking-change
+    attributes:
+      label: ¿Rompe algo publicado?
+      description: >-
+        El contrato OpenAPI, la forma del sobre `{ success, data, request }`, los nombres de las
+        variables de entorno o la superficie que un módulo exporta. Un cambio incompatible no se
+        descarta, pero se negocia distinto.
+      options:
+        - 'No: es aditivo'
+        - 'Sí: cambia el contrato HTTP publicado'
+        - 'Sí: cambia variables de entorno o configuración existente'
+        - 'Sí: cambia una regla de arquitectura que el código actual cumple'
+        - No lo sé
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas que consideraste
+      description: >-
+        Incluida la de no hacer nada. El repositorio prefiere registrar un descarte razonado a
+        acumular piezas sin consumidor — si la alternativa honesta es «esto es YAGNI hoy», dilo
+        y se registra como tal.
+
+  - type: textarea
+    id: done-criteria
+    attributes:
+      label: Cómo se sabría que está hecho
+      description: >-
+        La condición observable de cierre, en una frase. Es lo que exige cada entrada del backlog
+        y lo primero que va a faltar si no lo escribes aquí.
+      placeholder: 'Un `it` que ... y que se pone rojo sin el cambio.'

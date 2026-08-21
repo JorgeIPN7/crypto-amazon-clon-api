@@ -1,0 +1,68 @@
+# pnpm settings. Since pnpm 11 these live here only — the "pnpm" key in package.json is
+# ignored silently. This is a single-package repo, not a monorepo; the file exists to
+# carry the settings below.
+packages:
+  - '.'
+
+# @nestjs/cli ships its own `typescript` as a direct dependency (5.9.3 at the time of
+# writing) and `nest-cli.json` sets `typeCheck: true`, so without this override `nest build`
+# would type-check with that copy while `pnpm typecheck` used the root TypeScript 6 — two
+# compilers validating the same code. That is the entry's whole job, and the reason it cannot
+# just be deleted.
+#
+# ⚠️ Scoped to the path, not global. It was global until 2026-08-19, and that shape had a
+# failure mode `renovate.json` turns from latent into certain: this file is `enabled: false`
+# for Renovate, so the literal never moves on its own, while the `typescript` devDependency in
+# `package.json` is fully in scope. A global override WINS the resolution over that
+# devDependency, so the next TypeScript PR would have merged green — typecheck, lint and build
+# all passing against 6.0.3 — while the manifest advertised a newer version. Silently inert.
+#
+# Scoping alone only trades that for the opposite failure (the two compilers again, now
+# diverging), so it does not stand by itself: `src/__tests__/toolchain-pins.spec.ts` asserts
+# that exactly ONE `typescript` resolves in the tree and that it is the version `package.json`
+# declares. Bumping TypeScript means editing BOTH lines, and CI is what says so.
+#
+# The `$typescript` reference syntax would make it automatic and pnpm 11 still resolves it,
+# but it prints a deprecation warning on every install and disappears in pnpm 12; the blessed
+# replacement is a catalog, which needs `renovate.json` rules that cannot be verified offline.
+overrides:
+  '@nestjs/cli>typescript': 6.0.3
+  # `@nestjs/swagger` solo genera el documento OpenAPI; la interfaz la sirve Scalar desde
+  # `public/`. Sus 12 MB de assets no se cargan nunca: son merma que viajaría en la imagen.
+  #
+  # Quitarlo es seguro porque el require es perezoso — vive dentro de
+  # `getSwaggerAssetsAbsoluteFSPath()`, alcanzable solo desde `SwaggerModule.setup()`, que ya no
+  # se llama. Si alguien la reintroduce, el fallo es `MODULE_NOT_FOUND` en runtime y
+  # `--frozen-lockfile` reproduciría el estado roto en CI sin quejarse: por eso el E2E que
+  # arranca la aplicación y sirve la documentación es requisito, no adorno.
+  #
+  # El valor `'-'` elimina la dependencia; es sintaxis de pnpm desde 9.12.
+  swagger-ui-dist: '-'
+  # ⚠️ Aquí vivió `'@nestjs/swagger>js-yaml': '^5.2.2'`, el parche del CVE
+  # GHSA-pm4m-ph32-ghv5 (High, ReDoS al parsear flow collections). **Retirado el
+  # 2026-08-19 porque cumplió su propia condición de retirada**, que el comentario anterior
+  # dejaba escrita: `@nestjs/swagger@11.4.7` ya declara `js-yaml@5.3.0`, que lleva el fix.
+  #
+  # Lo único que seguía aportando era el techo `<6.0.0`, y ese techo era el defecto: un
+  # override sustituye la regla de upstream POR COMPLETO, así que mientras estuvo puesto el
+  # árbol se quedó en 5.2.3 en vez del 5.3.0 que swagger pinea, y el día que swagger pase a
+  # js-yaml 6.x por un cambio de API real lo habría retenido en 5.x sin imprimir nada:
+  # install, typecheck y lint en verde, y swagger roto en runtime.
+  #
+  # No hace falta reintroducirlo para vigilar el CVE. El gate que lo cazó la primera vez
+  # sigue puesto: `pnpm audit --prod --audit-level=high` en `ci.yml`, justo tras el install.
+  # Historia completa en `docs/backlog.md` §6.
+
+# pnpm blocks postinstall scripts by default. Each entry is an explicit trust decision.
+allowBuilds:
+  # Native binary for the transpiler that `nest build` and @swc/jest rely on.
+  '@swc/core': true
+  # Hashing nativo de passwords (argon2id). node-gyp-build usa el prebuild si existe
+  # y solo compila si no hay binario para la plataforma.
+  argon2: true
+  # Native resolver used by the ESLint import machinery.
+  unrs-resolver: true
+  # Transitive dep of @scalar/api-reference. Its postinstall picks a Vue 2/3 shim at install
+  # time, which only matters when the package is imported. We never import it: the build only
+  # reads the prebuilt `dist/browser/standalone.js` out of the tarball.
+  vue-demi: false

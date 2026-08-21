@@ -1,0 +1,52 @@
+{
+  "_comment": [
+    "Manifiesto de `scripts/init-project.mjs`: qué archivos llevan la identidad del template.",
+    "",
+    "Vive en un JSON y no dentro del `.mjs` porque `src/__tests__/init-project.spec.ts` lo",
+    "necesita como dato, y un test CommonJS (SWC) no puede importar un `.mjs` de forma fiable.",
+    "Una sola fuente, leída con readFileSync desde ambos lados.",
+    "",
+    "El gate del spec recorre el repo, busca los tokens del template y exige que cada archivo",
+    "que los contiene esté en `replace`, `handled` o `exempt`. Así, quien añada mañana una",
+    "ocurrencia nueva en un archivo no listado rompe la suite en vez de dejar el renombrado",
+    "a medias — que es el fallo silencioso que este script existe para evitar."
+  ],
+
+  "replace": [
+    ".env.example",
+    ".github/ISSUE_TEMPLATE/bug_report.yml",
+    ".github/ISSUE_TEMPLATE/config.yml",
+    ".github/ISSUE_TEMPLATE/feature_request.yml",
+    ".github/workflows/ci.yml",
+    ".husky/pre-commit",
+    "CLAUDE.md",
+    "README.md",
+    "SECURITY.md",
+    "docker-compose.yml",
+    "docker/initdb/01-create-test-database.sql",
+    "scripts/migrate-test-db.mjs",
+    "src/bootstrap/openapi-document.ts",
+    "src/bootstrap/openapi.ts",
+    "src/common/logger/pino-options.ts",
+    "src/config/env.schema.ts",
+    "src/modules/auth/__tests__/auth.e2e-spec.ts",
+    "src/modules/users/__tests__/users.e2e-spec.ts",
+    "test/helpers/config.factory.ts",
+    "test/setup-env.ts"
+  ],
+
+  "optional": [".env"],
+
+  "handled": {
+    "package.json": "Se reescribe campo a campo (name, version, description, author, repository, bugs, homepage), no por sustitución de texto: un reemplazo ciego dejaría `homepage` apuntando al repositorio del template.",
+    "CHANGELOG.md": "Se archiva en docs/template-history/ y se crea uno vacío: el historial del template no es el del proyecto nuevo.",
+    "docs/backlog.md": "Igual que el CHANGELOG. Se archiva sin renombrar tokens — es un registro histórico y reescribirlo lo falsearía."
+  },
+
+  "exempt": {
+    "scripts/init-project.mjs": "Contiene los tokens porque SON las reglas de sustitución.",
+    "scripts/init-project.targets.json": "Este mismo archivo.",
+    "src/__tests__/init-project.spec.ts": "El gate: necesita los tokens literales para buscarlos.",
+    "pnpm-lock.yaml": "Generado por pnpm. La entrada del propio paquete se regenera al instalar."
+  }
+}

@@ -1,0 +1,78 @@
+{
+  // El repositorio escribe su documentación y sus comentarios en español: sin el diccionario
+  // `es`, la extensión Code Spell Checker marca prácticamente cada palabra. Medido sobre
+  // `eslint.config.mjs`: 100 avisos solo con `en`, 5 con `en,es`.
+  //
+  // Esto NO es un gate: ninguna comprobación del Definition of Done ejecuta un corrector, y no
+  // hay dependencia de cspell en `package.json`. Es solo para que el editor deje de gritar.
+  "cSpell.language": "en,es",
+
+  // Lo que ningún diccionario puede saber. La lista salió de correr cspell con `en,es` sobre
+  // `src/**/*.ts` y los `.md` de la raíz, no de imaginar términos.
+  "cSpell.words": [
+    // Stack y herramientas
+    "claude",
+    "commitlint",
+    "dblink",
+    "gitleaks",
+    "mudblood",
+    "nestjs",
+    "openapi",
+    "openssl",
+    "plpgsql",
+    "postgres",
+    "prebuild",
+    "prestart",
+    "secretlint",
+    "stryker",
+    "swcrc",
+    "timestamptz",
+    "trivy",
+    "typeorm",
+    // Códigos de error y rutas convencionales
+    "EADDRINUSE",
+    "ECONNREFUSED",
+    "ENOENT",
+    "GHSA",
+    "HEALTHCHECK",
+    "healthz",
+    "livez",
+    "readyz",
+    // TypeScript, Nest y librerías
+    "metatype",
+    "Millis",
+    "nullable",
+    "paramtypes",
+    "prefault",
+    "Streamable",
+    // Fuentes que cita la CSP de la documentación
+    "Menlo",
+    "Neue",
+    "Segoe",
+    // Préstamos del inglés ya asentados en los comentarios del repo. Se listan por FORMA y no
+    // por infinitivo: cspell no conjuga las palabras que se le añaden a mano.
+    "deserializar",
+    "deserialice",
+    "hashea",
+    "Hashear",
+    "loguea",
+    "logueado",
+    "loguear",
+    "matchea",
+    "mockear",
+    "parsea",
+    "parsear",
+    "parseado",
+    "parseo",
+    "renderiza",
+    "renderizado",
+    "renderizador",
+    "serializa",
+    "serializar",
+    "stagea",
+    "stagear",
+    "testea",
+    "trackea",
+    "idempotente"
+  ]
+}

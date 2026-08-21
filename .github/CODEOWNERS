@@ -1,0 +1,91 @@
+# CODEOWNERS — quién tiene que mirar qué antes de que entre a `main`
+#
+# Sintaxis: <patrón> <owner...>. Gana la ÚLTIMA regla que casa, no la más específica,
+# así que el orden de este archivo es significativo: lo general arriba, lo delicado abajo.
+#
+# ⚠️ CODEOWNERS por sí solo NO obliga a nada. Solo asigna revisores automáticamente. Para
+# que además BLOQUEE el merge hace falta activar en Settings → Branches una regla de
+# protección sobre `main` con «Require a pull request before merging» + «Require review
+# from Code Owners». Sin eso, este archivo es documentación de a quién avisar.
+#
+# ⚠️ Y con un único mantenedor, GitHub no deja que el autor del PR se apruebe a sí mismo:
+# mientras el repositorio sea de una sola persona, activar el bloqueo obliga a usar
+# «bypass» en cada merge. El valor real de este archivo hoy es doble: declarar qué rutas
+# son delicadas y por qué, y quedar listo el día que entre un segundo colaborador.
+
+# Dueño global: todo lo que no case con nada más abajo.
+* @JorgeIPN7
+
+# ---------------------------------------------------------------------------------------
+# Rutas donde un cambio no revisado duele más.
+#
+# El criterio de esta lista no es «lo importante» —todo el repo lo es— sino algo más
+# estrecho: sitios donde un cambio pasa los gates en VERDE y aun así rompe algo, o donde
+# el daño no se puede deshacer. Un caso de uso mal escrito lo caza un test; nada de esto
+# lo caza un test que ya exista.
+# ---------------------------------------------------------------------------------------
+
+# Fronteras de módulo y de capa: son la arquitectura del repo expresada como lint. Aflojar
+# una fila de la matriz no rompe ningún test —los tests siguen verdes con la arquitectura
+# ya violada— y el daño solo se ve meses después, cuando los contextos están acoplados.
+# La suite va junta a propósito: comparte el archivo de reglas y es lo único que demuestra
+# que la matriz dice lo que cree decir.
+/eslint.boundaries.js                     @JorgeIPN7
+/eslint.config.mjs                        @JorgeIPN7
+/src/__tests__/eslint-boundaries.spec.ts  @JorgeIPN7
+
+# CI y workflows: es el código que decide si el resto del código entra. Un `continue-on-error`
+# de más, un SHA de action re-apuntado o un gate borrado convierten toda la CI en teatro
+# sin que nada se ponga rojo — por definición, porque lo que se tocó es el que se pone rojo.
+# Aquí viven además los gates de cadena de suministro (`pnpm audit`, trivy, gitleaks).
+/.github/workflows/                       @JorgeIPN7
+
+# Migraciones: es lo único del repositorio que NO se puede revertir con un `git revert`.
+# Una vez aplicada en producción, el estado de los datos ya cambió. Y el repo publica la
+# regla expand/contract: una migración destructiva mal partida tumba las réplicas viejas
+# durante el rodado.
+/src/database/migrations/                 @JorgeIPN7
+
+# Config: aquí se decide con qué secreto se firma un JWT, cuánto cuesta un hash argon2id,
+# si `synchronize` puede tocar el esquema y qué variables son obligatorias al arrancar.
+# Un default cambiado aquí degrada la seguridad de todos los entornos a la vez y ningún
+# test lo nota, porque el test también leería el default nuevo.
+/src/config/                              @JorgeIPN7
+
+# Umbral de mutación: `thresholds.break: 85` es el gate que impide que un módulo nuevo
+# entre sin casos. Bajarlo es el atajo obvio cuando el job se pone rojo, y es exactamente
+# lo que el gate existe para impedir. El 85 sale de un baseline medido, no de una intuición.
+/stryker.config.mjs                       @JorgeIPN7
+
+# Overrides de pnpm: cada entrada es una decisión curada a mano con su razonamiento en el
+# comentario, y `renovate.json` tiene el archivo desactivado justo por eso — una PR automática
+# que reescribiera una de ellas sin ese contexto sería peor que no tener Renovate ahí.
+#
+# El caso que manda hoy es el override de `typescript`, y lo que hay que leer antes de tocarlo
+# es su SCOPE. Sin scope gana la resolución sobre el devDependency de `package.json`, que sí
+# está en el alcance de Renovate, y hace INERTE todo bump futuro de TypeScript: la PR mergea en
+# verde mientras el manifiesto anuncia una versión que nadie compila. Con scope y los dos
+# literales divergiendo hay dos compiladores validando el mismo código. Ninguna de las dos cosas
+# la caza un test que ya existiera; la caza `src/__tests__/toolchain-pins.spec.ts`, añadido para
+# eso, y por eso va en esta lista.
+#
+# Hasta el 2026-08-19 este párrafo decía que aquí vivía el parche de un CVE real
+# (GHSA-pm4m-ph32-ghv5, vía `@nestjs/swagger>js-yaml`). Ya no: upstream adoptó el fix y el
+# override se retiró, dejando su lápida en el archivo. Lo que vigila ese frente es el gate
+# `pnpm audit --prod --audit-level=high` de `ci.yml`, no este archivo.
+/pnpm-workspace.yaml                      @JorgeIPN7
+
+# Config del escáner de secretos y su contrato. Relajarla no falla nada: simplemente deja
+# de encontrar cosas, que es el modo de fallo más silencioso posible para un gate.
+/.secretlintrc.json                       @JorgeIPN7
+/src/__tests__/secretlint.spec.ts         @JorgeIPN7
+
+# Contrato de los pines del toolchain: afirma que `.nvmrc`, `.node-version`, el `FROM` del
+# Dockerfile y el suelo de `engines.node` dicen la misma versión, y que en el árbol resuelve una
+# sola copia de `typescript`. Es lo único que impide que un bump automático mueva tres de los
+# cuatro pines y quede verde, que es lo que pasó dos veces antes de que existiera.
+/src/__tests__/toolchain-pins.spec.ts     @JorgeIPN7
+
+# Este archivo y la licencia: quién revisa qué, y bajo qué términos se publica el código.
+/.github/CODEOWNERS                       @JorgeIPN7
+/LICENSE                                  @JorgeIPN7

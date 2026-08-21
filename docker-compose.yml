@@ -1,0 +1,49 @@
+# Nombre de proyecto explícito. Sin esta línea Compose lo deriva del NOMBRE DE LA CARPETA,
+# y como `container_name` de abajo es fijo y global en Docker, clonar el repo en un
+# directorio con otro nombre —lo normal: `git clone <url> mi-api`— hace que `db:up` falle
+# con «container name is already in use» y, peor, que `db:down` y `db:reset` operen sobre un
+# proyecto vacío y **no hagan nada sin decirlo**. Medido: con el nombre derivado de la
+# carpeta, `docker compose ps` no listaba el contenedor que sí estaba corriendo.
+#
+# Precedencia de Compose, de menor a mayor: nombre de la carpeta → este `name:` →
+# COMPOSE_PROJECT_NAME del `.env` → COMPOSE_PROJECT_NAME del shell → flag `-p`. Va aquí y no
+# en `.env.example` porque el `.env` no se versiona: quien clone necesita que funcione sin
+# copiar una línea a mano.
+name: nest-base-template
+
+services:
+  postgres:
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+    container_name: nest-base-template-db
+    restart: unless-stopped
+    environment:
+      # Alineado con los defaults de `src/config/env.schema.ts`, para que un `.env`
+      # recién copiado de `.env.example` conecte sin tocar nada.
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_DATABASE:-nest_base_template}
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      # Postgres 18 cambió la convención: el mount va en /var/lib/postgresql y la imagen
+      # coloca los datos en un subdirectorio por versión, para permitir `pg_upgrade --link`.
+      # Montar en /var/lib/postgresql/data (lo correcto hasta la 17) hace que arranque en bucle.
+      - postgres-data:/var/lib/postgresql
+      # Crea la base de tests junto a la de desarrollo, para que `pnpm test:e2e` no trunque
+      # los datos locales. El entrypoint solo lo ejecuta al inicializar un volumen vacío:
+      # sobre un contenedor que ya existía hace falta `pnpm db:reset`.
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # `pg_isready` evita que la app arranque contra una base que todavía inicializa.
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-nest_base_template}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:
