@@ -45,6 +45,20 @@ const SKIPPED_DIRECTORIES = new Set([
   'reports',
 ]);
 
+/**
+ * Historial archivado del template: versionado, pero fuera del alcance del gate. `archiveHistory()`
+ * de `init-project.mjs` mueve aquí el CHANGELOG y el backlog del template **sin renombrar los
+ * tokens**, a propósito — reescribir un registro histórico lo falsea. Los contienen por diseño, así
+ * que recorrerlos convierte el éxito del script en un fallo de esta suite: todo proyecto derivado
+ * nacía con `pnpm test` en rojo salvo que se hubiera usado `--self-destruct`, que borra el gate y
+ * por eso escondía el defecto.
+ *
+ * No van al manifiesto: ese declara la ENTRADA del script —los archivos que reescribe— y esto es lo
+ * que PRODUCE. Ponerlos en `exempt` rompería además el gate hermano «solo rutas que existen» en el
+ * repositorio template, donde este directorio todavía no existe.
+ */
+const ARCHIVED_PATHS = new Set(['docs/template-history']);
+
 /** Archivos grandes o binarios que no aportan y sí ralentizan. */
 const MAX_BYTES = 5_000_000;
 
@@ -130,10 +144,9 @@ const collectRepositoryFiles = (directory: string, prefix = ''): string[] => {
 
   for (const entry of entries) {
     if (entry.isDirectory()) {
-      if (!SKIPPED_DIRECTORIES.has(entry.name)) {
-        files.push(
-          ...collectRepositoryFiles(join(directory, entry.name), `${prefix}${entry.name}/`),
-        );
+      const relativeDirectory = `${prefix}${entry.name}`;
+      if (!SKIPPED_DIRECTORIES.has(entry.name) && !ARCHIVED_PATHS.has(relativeDirectory)) {
+        files.push(...collectRepositoryFiles(join(directory, entry.name), `${relativeDirectory}/`));
       }
       continue;
     }
