@@ -13,9 +13,9 @@ blank_issues_enabled: false
 
 contact_links:
   - name: Reportar una vulnerabilidad (en privado)
-    url: https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/security/advisories/new
+    url: https://github.com/JorgeIPN7/crypto-amazon-clon-api/security/advisories/new
     about: Los fallos de seguridad NO se reportan como issue público. Usa el aviso privado de GitHub; la política completa está en SECURITY.md.
 
   - name: Trabajo ya aplazado, con su decisión escrita
-    url: https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/blob/main/docs/backlog.md
+    url: https://github.com/JorgeIPN7/crypto-amazon-clon-api/blob/main/docs/backlog.md
     about: El backlog es el gestor de incidencias real del repositorio. Registra qué se aplazó y por qué, y también lo que se cerró tras verificar que no era un problema. Léelo antes de abrir un issue.

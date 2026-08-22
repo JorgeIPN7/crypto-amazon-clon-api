@@ -70,11 +70,11 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: nest_base_template
+          POSTGRES_DB: crypto_amazon_clon_api
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres -d nest_base_template"
+          --health-cmd="pg_isready -U postgres -d crypto_amazon_clon_api"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
@@ -84,7 +84,7 @@ jobs:
       DB_PORT: 5432
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
-      DB_DATABASE: nest_base_template
+      DB_DATABASE: crypto_amazon_clon_api
       DB_SCHEMA: public
       DB_SSL: 'false'
 
@@ -165,13 +165,13 @@ jobs:
       # El servicio de Postgres no ejecuta `docker/initdb/`, así que la base de tests se
       # crea aquí a mano. En local la crea el init script al levantar el contenedor.
       - name: Create test database
-        run: PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE nest_base_template_test'
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE crypto_amazon_clon_api_test'
 
       # Las migraciones se aplican a la base de tests, que es contra la que corren los E2E.
       - name: Run migrations
         run: pnpm migration:run
         env:
-          DB_DATABASE: nest_base_template_test
+          DB_DATABASE: crypto_amazon_clon_api_test
 
       - name: E2E tests
         run: pnpm test:e2e:ci
@@ -190,7 +190,7 @@ jobs:
       # despliega, y la divergencia crece con la edad de la caché. En los runners hosted siempre
       # está frío, que es exactamente lo que lo esconde.
       - name: Docker build
-        run: docker build --pull -t nest-base-template:ci .
+        run: docker build --pull -t crypto-amazon-clon-api:ci .
 
       # Gate de cadena de suministro (backlog #6): CVEs HIGH/CRITICAL CON FIX
       # disponible en la imagen rompen la CI. ignore-unfixed mantiene el gate
@@ -200,7 +200,7 @@ jobs:
       - name: Scan de la imagen (trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: nest-base-template:ci
+          image-ref: crypto-amazon-clon-api:ci
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'

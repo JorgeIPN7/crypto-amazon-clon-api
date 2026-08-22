@@ -136,7 +136,7 @@ export const buildPrettyTransport = (pretty: boolean) =>
 export const buildPinoHttpOptions = (logCfg: LogConfig, appCfg: AppConfig) => ({
   level: logCfg.level,
   base: {
-    service: process.env.npm_package_name ?? 'nest-base-template',
+    service: process.env.npm_package_name ?? 'crypto-amazon-clon-api',
     env: appCfg.env,
     version: process.env.npm_package_version ?? '0.0.0',
   },

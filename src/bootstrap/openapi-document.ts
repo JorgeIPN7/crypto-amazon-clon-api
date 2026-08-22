@@ -20,7 +20,7 @@ export function buildOpenApiDocument(app: INestApplication, appCfg: AppConfig): 
   return SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle('Nest Base Template API')
+      .setTitle('Amazon clon | Crypto API')
       .setDescription('Production-ready NestJS 11 service')
       .setVersion(appCfg.apiVersion)
       .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')

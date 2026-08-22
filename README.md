@@ -1,69 +1,8 @@
-# nest-base-template
+# crypto-amazon-clon-api
 
 Base NestJS 11 lista para producción: arquitectura hexagonal (Clean Architecture + DDD), TypeORM sobre PostgreSQL, SWC, Pino, configuración validada con Zod, documentación OpenAPI servida con Scalar, Terminus, rate limiting y seguridad por defecto.
 
 **Si acabas de clonar esto, ve directo a [Puesta en marcha](#puesta-en-marcha).** Son seis comandos.
-
-<!-- template-only:start -->
-
----
-
-## Empezar un proyecto nuevo desde esta base
-
-Dos pasos, en este orden, y después [Puesta en marcha](#puesta-en-marcha) como todo el mundo. Esta sección solo existe mientras el repositorio **es** el template: `pnpm init:project` la borra del README del proyecto derivado, junto con el resto de bloques marcados `template-only`.
-
-### Paso 0: Traerte el código
-
-> ### ✅ Usa el botón «Use this template», en la página del repositorio en GitHub
->
-> Te entrega todo el árbol en **un commit inicial limpio**, sin relación con el original. Las otras tres formas funcionan, pero ninguna es mejor que esta.
-
-| Forma                          | Cómo                                                                         | Veredicto                                                                                                                                                        |
-| ------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Botón «Use this template»**  | En la página del repositorio en GitHub                                       | ✅ **Recomendada.** Un commit inicial, limpio                                                                                                                    |
-| `degit` / `giget`              | `pnpm dlx giget gh:JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood mi-api` | Sirve si no quieres pasar por la interfaz web, o si el origen no está en GitHub. Descarga el árbol sin `.git`                                                    |
-| `git clone` + reiniciar el git | `git clone --depth 1 <url> mi-api && cd mi-api && rm -rf .git && git init`   | Equivalente a la anterior, con más pasos                                                                                                                         |
-| **Fork**                       | Botón _Fork_                                                                 | ❌ **No.** Un fork no es una copia independiente, es una rama pública del original: los PR apuntan por defecto al repositorio de origen y el tuyo sale en su red |
-
-El botón no arrastra historial, tags, releases, issues, wiki ni los _secrets_ de GitHub Actions. Da igual: la CI de este repositorio no usa ninguno, así que funciona desde el primer push.
-
-> **⚠️ Copiar y pegar los archivos en una carpeta nueva es la peor opción, y no por comodidad.** El explorador de archivos oculta lo que empieza por punto, que es justo donde vive media configuración. Tres pérdidas son graves:
->
-> | Lo que no copias                            | Qué deja de funcionar                                                                                                                                                        |
-> | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-> | `.swcrc`                                    | **⚠️ La inyección de dependencias, en runtime.** Sin `decoratorMetadata` Nest no sabe qué inyectar y muere con `Nest can't resolve dependencies` — con el typecheck en verde |
-> | `.husky/`, `.github/`, `.secretlintrc.json` | Todos los gates a la vez: pre-commit, commitlint, escaneo de secretos y la CI entera. Nada verifica un PR                                                                    |
-> | `.gitignore`, `.env.example`                | Acabas commiteando `node_modules/`, `dist/` y tu `.env` —con el `JWT_SECRET` dentro—, y pierdes el único sitio donde está documentada cada variable                          |
->
-> Se quedan también `.prettierrc`, `.prettierignore`, `.editorconfig`, `.nvmrc` y `.node-version`: formato y versión de Node dejan de estar fijados, y el primer `pnpm format:check` reformatea el repositorio entero. Y aunque copies los ocultos, sigue faltando `.git`: sin él `pnpm install` termina bien pero imprime `husky - .git can't be found` y los hooks no quedan instalados.
-
-### Paso 1: Ponerle tu nombre con `pnpm init:project`
-
-**Requerido, y antes de `pnpm install`.** El script es Node puro —no importa nada de `node_modules`—, así que corre en un árbol recién descargado; hacerlo antes evita que `pnpm-lock.yaml` guarde el nombre viejo.
-
-```bash
-pnpm init:project --name mi-api --title "Mi API" --description "API de ejemplo" --author "Tu Nombre <tu@correo.com>" --repo https://github.com/tu-org/mi-api
-```
-
-Solo `--name` es obligatorio; el resto tiene default, se deriva o se pregunta. Añade `--dry-run` al final para ver el plan sin escribir nada.
-
-| Qué toca                           | Cómo                                                                                                                                                                             |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 20 archivos con el nombre literal  | Sustitución de tokens: paquete, base de datos (la de desarrollo **y** la de tests), proyecto y contenedor de Compose, título OpenAPI, `service` de los logs, URL del repositorio |
-| `package.json`                     | Campo a campo: `name`, `version` a `0.1.0`, `description`, `author`. Sin `--repo`, **elimina** `repository`, `bugs` y `homepage` en lugar de dejarlos apuntando aquí             |
-| `CHANGELOG.md` y `docs/backlog.md` | Los archiva en `docs/template-history/` y crea los del proyecto nuevo, vacíos. No los reescribe: son historia real de otro proyecto, y renombrarla la falsearía                  |
-| Los bloques `template-only`        | Los recorta del README                                                                                                                                                           |
-| Un `JWT_SECRET`                    | Lo genera y lo **imprime** — nunca lo escribe en un archivo: `.env.example` está versionado y `secretlint` bloquearía el commit, con razón                                       |
-
-**Al terminar imprime ese `JWT_SECRET` y los pasos que siguen: son los de [Puesta en marcha](#puesta-en-marcha).** Con una diferencia — si ya habías levantado la base **antes** de renombrar, usa `pnpm db:reset` en vez de `pnpm db:up`: el nombre de la base cambió y el volumen anterior contiene la antigua.
-
-Lo que **no** hace: tocar git, ajustar el `scope-enum` de `commitlint.config.cjs` y borrar los módulos de ejemplo (eso es [una checklist aparte](#quitar-los-módulos-de-ejemplo)). Tampoco se autoelimina salvo con `--self-destruct`, para que un renombrado interrumpido a mitad se pueda reintentar.
-
-> **⚠️ Dos límites que el script valida, y conviene saber antes de elegir nombre:** el slug va en `kebab-case` (`^[a-z][a-z0-9-]*$`), y su versión `snake_case` no puede pasar de **58 caracteres** — el techo de 63 de PostgreSQL menos el sufijo `_test`.
-
-`src/__tests__/init-project.spec.ts` vigila el manifiesto del script contra el repositorio real. Si alguien escribe el nombre del template en un archivo nuevo sin declararlo, la suite se pone roja — sin ese gate, el renombrado quedaría a medias en silencio.
-
-<!-- template-only:end -->
 
 ---
 
@@ -104,15 +43,9 @@ Nada de esto requiere darse de alta en ningún servicio. **El proyecto no usa to
 
 ### La receta, de cero a la API respondiendo
 
-<!-- template-only:start -->
-
-> **¿Vienes del botón «Use this template»?** Ejecuta primero [`pnpm init:project`](#paso-1-ponerle-tu-nombre-con-pnpm-initproject) — antes de `pnpm install`.
-
-<!-- template-only:end -->
-
 ```bash
 # 1 · Traerte el código
-git clone https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood.git mi-api && cd mi-api
+git clone https://github.com/JorgeIPN7/crypto-amazon-clon-api.git mi-api && cd mi-api
 
 # 2 · Fijar el toolchain
 nvm use                  # o instala Node 24.19.0 a mano
@@ -175,7 +108,7 @@ El detalle completo de cada variable —qué controla, con qué combina mal y d�
 
 ### Personalizar la base de datos
 
-Los valores por defecto son `postgres` / `postgres` / `nest_base_template`, que coinciden con los del `docker-compose.yml` para que un `.env` recién copiado conecte sin tocar nada. Para cambiarlos:
+Los valores por defecto son `postgres` / `postgres` / `crypto_amazon_clon_api`, que coinciden con los del `docker-compose.yml` para que un `.env` recién copiado conecte sin tocar nada. Para cambiarlos:
 
 | Qué quieres cambiar                | Cómo                                                                                                                                                                              | Cuándo                                         |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
@@ -189,7 +122,7 @@ Funciona porque `docker-compose.yml` **lee esas cuatro variables de tu `.env`**,
 ```yaml
 POSTGRES_USER: ${DB_USERNAME:-postgres}
 POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-POSTGRES_DB: ${DB_DATABASE:-nest_base_template}
+POSTGRES_DB: ${DB_DATABASE:-crypto_amazon_clon_api}
 ports: ['${DB_PORT:-5432}:5432']
 ```
 
@@ -252,7 +185,7 @@ El seed necesita las migraciones aplicadas —escribe SQL crudo sobre `users` y 
 
 ```bash
 pnpm test                # unitarios: no necesitan nada levantado
-pnpm db:migrate:test     # migra nest_base_template_test
+pnpm db:migrate:test     # migra crypto_amazon_clon_api_test
 pnpm test:e2e            # E2E: necesita PostgreSQL y la base de tests migrada
 ```
 
@@ -294,33 +227,6 @@ Merece la pena leerlo: casi todos los tropiezos de la primera vez están aquí.
 **Los logs salen como JSON en una sola línea** — Es el comportamiento por defecto. Pon `LOG_PRETTY=true` en tu `.env` para leerlos cómodamente en desarrollo.
 
 **`pnpm test` pasa en local y CI falla** — `pnpm test` no mide cobertura; `pnpm test:ci` sí, y aplica umbrales. Ejecuta `pnpm test:cov` antes de subir. Del mismo modo, CI instala con `--frozen-lockfile`: si tocaste `package.json` sin regenerar `pnpm-lock.yaml`, fallará solo allí.
-
-<!-- template-only:start -->
-
----
-
-## Quitar los módulos de ejemplo
-
-Con el proyecto ya arrancando, si no vas a usar los contextos de ejemplo, quítalos **a mano y en este orden**. `health` se queda siempre. Los otros tres son ejemplos, pero **no son independientes**:
-
-| Módulo   | ¿Se puede quitar?                | Qué arrastra                                                                                  |
-| -------- | -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `orders` | Sí, sin tocar nada más           | Es el único consumidor de `UsersLookup`; nadie depende de él                                  |
-| `auth`   | Sí, pero deja la API **abierta** | Registra el `APP_GUARD` global. Quitarlo sin sustituirlo deja todo endpoint sin autenticación |
-| `users`  | **No sin reescribir `auth`**     | `auth` consume `UsersLookup` y `UsersProvisioning`; sin ellos no hay ni login ni registro     |
-
-Para cada módulo que quites:
-
-1. Borra `src/modules/<contexto>/` entera — los tests van dentro, así que se van con ella.
-2. Quita su import y su entrada en `imports:` de [`src/app.module.ts`](src/app.module.ts).
-3. Borra su migración y la tabla que creó. La de `orders` es [`1786076763455-create-orders-and-outbox.ts`](src/database/migrations/1786076763455-create-orders-and-outbox.ts); si ya la aplicaste, `pnpm migration:revert` antes de borrar el archivo. Con la base todavía sin datos, `pnpm db:reset` es más rápido.
-4. Quita su scope del `scope-enum` de [`commitlint.config.cjs`](commitlint.config.cjs).
-5. Si era `orders`, quita también `pnpm outbox:relay` de `package.json` y `src/database/outbox/`.
-6. Revisa las secciones que lo describen en este README y en [`CLAUDE.md`](CLAUDE.md).
-7. **Vuelve a medir la mutación.** `stryker.config.mjs` apunta por globs, así que no hay que editarlo, pero el umbral `break: 85` está calibrado sobre el peso en mutantes de los módulos actuales: quitar uno mueve el score global. Corre `pnpm test:mutation` y ajusta el umbral con el número nuevo, no a ojo.
-8. Definition of Done completo: `typecheck` → `lint:check` → `format:check` → `test` → `test:e2e` → `build`.
-
-<!-- template-only:end -->
 
 ---
 
@@ -385,17 +291,17 @@ La columna **¿Tocarla?** responde lo único que se suele preguntar: `No` = el d
 
 ### PostgreSQL
 
-| Variable                                                               | Default                                        | ¿Tocarla?    | Notas                                                                                                            |
-| ---------------------------------------------------------------------- | ---------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `DB_HOST` / `DB_PORT`                                                  | `localhost` / `5432`                           | **Prod: sí** | Ver [problemas frecuentes](#problemas-frecuentes) si ya tienes Postgres instalado.                               |
-| `DB_USERNAME` / `DB_PASSWORD` / `DB_DATABASE`                          | `postgres` / `postgres` / `nest_base_template` | **Prod: sí** | Coinciden con los del `docker-compose.yml`. Ver [personalizar](#personalizar-la-base-de-datos).                  |
-| `DB_SCHEMA`                                                            | `public`                                       | No           | Schema donde viven las tablas.                                                                                   |
-| `DB_SSL` / `DB_SSL_REJECT_UNAUTHORIZED` / `DB_SSL_CA`                  | `false` / `true` / —                           | **Prod: sí** | Ver [conexión y TLS](#conexión-y-tls-rds).                                                                       |
-| `DB_SYNCHRONIZE`                                                       | `false`                                        | No           | Solo surte efecto en `development`; ver abajo.                                                                   |
-| `DB_MIGRATIONS_RUN`                                                    | `false`                                        | **Prod**     | Solo surte efecto **fuera** de `development`. Lee el aviso de [deploy notes](#deploy-notes) antes de encenderla. |
-| `DB_LOGGING`                                                           | `false`                                        | No           | Registra cada consulta SQL. **Ese log no pasa por la redacción de Pino.**                                        |
-| `DB_POOL_MAX` / `DB_POOL_IDLE_TIMEOUT_MS` / `DB_CONNECTION_TIMEOUT_MS` | `10` / `30000` / `10000`                       | **Prod**     | Pool de `pg`. `DB_POOL_MAX × réplicas` no debe superar el `max_connections`.                                     |
-| `DB_DATABASE_TEST`                                                     | `nest_base_template_test`                      | Opcional     | La **única variable que no pasa por la validación**: la lee `test/setup-env.ts` directamente.                    |
+| Variable                                                               | Default                                            | ¿Tocarla?    | Notas                                                                                                            |
+| ---------------------------------------------------------------------- | -------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `DB_HOST` / `DB_PORT`                                                  | `localhost` / `5432`                               | **Prod: sí** | Ver [problemas frecuentes](#problemas-frecuentes) si ya tienes Postgres instalado.                               |
+| `DB_USERNAME` / `DB_PASSWORD` / `DB_DATABASE`                          | `postgres` / `postgres` / `crypto_amazon_clon_api` | **Prod: sí** | Coinciden con los del `docker-compose.yml`. Ver [personalizar](#personalizar-la-base-de-datos).                  |
+| `DB_SCHEMA`                                                            | `public`                                           | No           | Schema donde viven las tablas.                                                                                   |
+| `DB_SSL` / `DB_SSL_REJECT_UNAUTHORIZED` / `DB_SSL_CA`                  | `false` / `true` / —                               | **Prod: sí** | Ver [conexión y TLS](#conexión-y-tls-rds).                                                                       |
+| `DB_SYNCHRONIZE`                                                       | `false`                                            | No           | Solo surte efecto en `development`; ver abajo.                                                                   |
+| `DB_MIGRATIONS_RUN`                                                    | `false`                                            | **Prod**     | Solo surte efecto **fuera** de `development`. Lee el aviso de [deploy notes](#deploy-notes) antes de encenderla. |
+| `DB_LOGGING`                                                           | `false`                                            | No           | Registra cada consulta SQL. **Ese log no pasa por la redacción de Pino.**                                        |
+| `DB_POOL_MAX` / `DB_POOL_IDLE_TIMEOUT_MS` / `DB_CONNECTION_TIMEOUT_MS` | `10` / `30000` / `10000`                           | **Prod**     | Pool de `pg`. `DB_POOL_MAX × réplicas` no debe superar el `max_connections`.                                     |
+| `DB_DATABASE_TEST`                                                     | `crypto_amazon_clon_api_test`                      | Opcional     | La **única variable que no pasa por la validación**: la lee `test/setup-env.ts` directamente.                    |
 
 ---
 
@@ -536,12 +442,12 @@ src/modules/users/
 
 ### Base de datos de los tests
 
-Los E2E corren contra **`nest_base_template_test`**, no contra tu base de desarrollo, porque cada test hace `TRUNCATE` en su `beforeEach`. La crea el init script de `docker/initdb/` al inicializar el volumen, y `test/setup-env.ts` apunta la suite ahí antes de que arranque el `AppModule`.
+Los E2E corren contra **`crypto_amazon_clon_api_test`**, no contra tu base de desarrollo, porque cada test hace `TRUNCATE` en su `beforeEach`. La crea el init script de `docker/initdb/` al inicializar el volumen, y `test/setup-env.ts` apunta la suite ahí antes de que arranque el `AppModule`.
 
 > **⚠️ Crearla no es migrarla.** Un `.sql` de `docker-entrypoint-initdb.d` solo hace `CREATE DATABASE`. El paso que falta es **[`pnpm db:migrate:test`](#correr-los-tests)**, y hay que repetirlo cada vez que generes una migración nueva. `pnpm db:reset` ya lo incluye.
 
 > Si tenías el contenedor creado de antes, el init script no se ejecuta sobre un volumen existente. Corre `pnpm db:reset` (borra los datos locales) o crea la base a mano:
-> `docker exec nest-base-template-db psql -U postgres -c 'CREATE DATABASE nest_base_template_test'`
+> `docker exec crypto-amazon-clon-api-db psql -U postgres -c 'CREATE DATABASE crypto_amazon_clon_api_test'`
 
 ### Cobertura
 
@@ -585,8 +491,8 @@ El umbral de `branches` (50) es más bajo que el resto a propósito: SWC instrum
 ```bash
 pnpm db:up                              # solo la base de datos (desarrollo)
 
-docker build -t nest-base-template .    # imagen de la aplicación
-docker run --env-file .env -p 8888:8888 nest-base-template
+docker build -t crypto-amazon-clon-api .    # imagen de la aplicación
+docker run --env-file .env -p 8888:8888 crypto-amazon-clon-api
 ```
 
 El `Dockerfile` es multi-stage (deps → build → production), corre como usuario `node` sin privilegios e incluye un `HEALTHCHECK` contra el endpoint de liveness, cuya ruta se construye desde `GLOBAL_PREFIX` y `API_VERSION`.

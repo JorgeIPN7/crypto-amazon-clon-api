@@ -8,7 +8,7 @@
  *
  *  1. Los E2E hacen TRUNCATE en cada `beforeEach` —lo necesitan para afirmar conteos
  *     exactos y para ser repetibles, porque si no el índice único de email devolvería 409
- *     en la segunda corrida—. Sin esto apuntaban a `nest_base_template`, la misma base que
+ *     en la segunda corrida—. Sin esto apuntaban a `crypto_amazon_clon_api`, la misma base que
  *     usa `pnpm start:dev`, así que cada `pnpm test:e2e` borraba los datos locales.
  *
  *  2. Con `NODE_ENV=development`, `resolveSynchronize()` permite que `DB_SYNCHRONIZE=true`
@@ -19,7 +19,7 @@
  * quien tenga el contenedor en un puerto distinto no necesite configurar nada más.
  */
 process.env.NODE_ENV = 'test';
-process.env.DB_DATABASE = process.env.DB_DATABASE_TEST ?? 'nest_base_template_test';
+process.env.DB_DATABASE = process.env.DB_DATABASE_TEST ?? 'crypto_amazon_clon_api_test';
 
 // Los E2E nunca deben tocar el esquema: para eso están las migraciones.
 process.env.DB_SYNCHRONIZE = 'false';

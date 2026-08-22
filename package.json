@@ -1,18 +1,18 @@
 {
-  "name": "nest-base-template",
-  "version": "0.0.1",
-  "description": "NestJS 11 production-ready base (SWC, Pino, Zod config, Scalar/OpenAPI, Terminus)",
-  "author": "Jorge H <jorge.ipn.7@gmail.com>",
+  "name": "crypto-amazon-clon-api",
+  "version": "0.1.0",
+  "description": "API Clon de Amazon usando crypto",
+  "author": "JorgeIPN7 <jorge.ipn.7@gmail.com>",
   "private": true,
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood.git"
+    "url": "git+https://github.com/JorgeIPN7/crypto-amazon-clon-api.git"
   },
   "bugs": {
-    "url": "https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/issues"
+    "url": "https://github.com/JorgeIPN7/crypto-amazon-clon-api/issues"
   },
-  "homepage": "https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood#readme",
+  "homepage": "https://github.com/JorgeIPN7/crypto-amazon-clon-api#readme",
   "engines": {
     "node": ">=24.19.0 <25.0.0",
     "pnpm": ">=11.0.0"

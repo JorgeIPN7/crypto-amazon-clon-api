@@ -12,7 +12,7 @@ body:
 
         Antes de escribir, dos lecturas que probablemente contienen ya la respuesta:
 
-        - [`docs/backlog.md`](https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/blob/main/docs/backlog.md)
+        - [`docs/backlog.md`](https://github.com/JorgeIPN7/crypto-amazon-clon-api/blob/main/docs/backlog.md)
           — el trabajo aplazado **con su criterio ya decidido**, y la sección «Cerrado al
           verificarlo», que registra lo que se descartó para que nadie lo reinvestigue
           (OpenTelemetry, circuit breakers, feature flags, testcontainers).

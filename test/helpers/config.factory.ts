@@ -43,7 +43,7 @@ export const buildDatabaseConfig = (overrides: Partial<DatabaseConfig> = {}): Da
   port: 5432,
   username: 'postgres',
   password: 'postgres',
-  database: 'nest_base_template',
+  database: 'crypto_amazon_clon_api',
   schema: 'public',
   ssl: false,
   synchronize: false,

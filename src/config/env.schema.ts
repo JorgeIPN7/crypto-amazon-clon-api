@@ -115,7 +115,7 @@ const baseEnvSchema = z.object({
   DB_PORT: rejectEmpty(int().positive().max(65_535)).default(5432),
   DB_USERNAME: z.string().min(1).default('postgres'),
   DB_PASSWORD: z.string().default('postgres'),
-  DB_DATABASE: z.string().min(1).default('nest_base_template'),
+  DB_DATABASE: z.string().min(1).default('crypto_amazon_clon_api'),
   DB_SCHEMA: z.string().min(1).default('public'),
 
   // TLS. En local Postgres corre sin cifrado; contra RDS se activa DB_SSL=true.

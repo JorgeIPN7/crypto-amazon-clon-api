@@ -1,4 +1,4 @@
-# _nest-base-template
+# crypto-amazon-clon-api
 
 Production-ready NestJS 11 base template. Hexagonal/DDD layout, SWC builds, Pino logging with request-id via CLS, Zod-validated config, self-hosted Scalar API reference over OpenAPI, Terminus health checks.
 
@@ -35,13 +35,13 @@ pnpm start:dev      # watch mode
 pnpm db:up          # docker compose up -d --wait postgres (blocks until healthy)
 pnpm db:down        # stop it
 pnpm db:reset       # drop the volume, start clean and migrate BOTH databases
-pnpm db:migrate:test     # migrate nest_base_template_test — the E2E suite needs it
+pnpm db:migrate:test     # migrate crypto_amazon_clon_api_test — the E2E suite needs it
 pnpm migration:run       # apply pending migrations
 pnpm migration:revert    # roll back the last one
 pnpm migration:generate src/database/migrations/<Name>   # diff entities vs schema
 ```
 
-**Definition of Done** for any change: `typecheck` → `lint:check` → `format:check` → `test` → `test:e2e` → `build`, all green. The E2E suite needs PostgreSQL running (`pnpm db:up`) and runs against the separate `nest_base_template_test` database, created by `docker/initdb/`.
+**Definition of Done** for any change: `typecheck` → `lint:check` → `format:check` → `test` → `test:e2e` → `build`, all green. The E2E suite needs PostgreSQL running (`pnpm db:up`) and runs against the separate `crypto_amazon_clon_api_test` database, created by `docker/initdb/`.
 
 **`docker/initdb/` creates that database but never migrates it** — the TypeORM CLI reads `DB_DATABASE` from the `.env`, which points at the dev database, and `test/setup-env.ts` redirects only inside the Jest process. So the first `pnpm test:e2e` on a fresh clone needs `pnpm db:migrate:test` first, or it dies with `relation "auth_credentials" does not exist` — measured against a freshly created database: `auth.e2e-spec.ts` runs first and its `beforeEach` truncates that table before any other. It reads like a bug in the code and it is a schema nobody migrated. `pnpm db:reset` does both databases and needs nothing extra. Closed as backlog #18 on 2026-08-20; the entry records why the script is a `.mjs` and not a `VAR=value` prefix (Windows, and no `cross-env` in the tree).
 
@@ -410,7 +410,7 @@ Related: Zod's `.default()` only fires on `undefined`, so a variable that is pre
 - **Mocking by layer:** no mocks in `domain/`; hand-written port fakes in `application/` (see `__tests__/helpers/in-memory-user.repository.ts`), never `jest.mock`; repositories are tested against real PostgreSQL in the E2E suite. Modules, TypeORM repositories, `data-source.ts`, seeds, the outbox CLI and migrations are excluded from _unit_ coverage on purpose, and `test/jest-e2e.config.mjs` measures them with its own threshold — **except `src/database/migrations/**`, which no suite measures**. That exception is deliberate and now written down: they are one-shot DDL run by the CLI, and the fact that nothing exercises them directly is open debt with its own entry (`docs/backlog.md` #17), not something the E2E config quietly covers. Until 2026-08-19 this sentence claimed the E2E suite measured "exactly those files" while its list held two of the six patterns, so four groups were measured by neither.
 - **Shared fixtures:** module-wide helpers go in `<module>/__tests__/helpers/` (e.g. `user.factory.ts`, `arbitraries.ts`); cross-cutting ones in `test/helpers/` (e.g. `config.factory.ts`), imported via `@test/`. Never copy a builder into several specs.
 - **Property-based testing with `fast-check`** for value objects, pure functions and mapping round-trips. Arbitraries are **constructed**, never `.filter()`-ed out of `fc.string()`.
-- **The E2E suite runs against `nest_base_template_test`**, not the dev database — `test/setup-env.ts` forces `NODE_ENV=test` and the database name before the `AppModule` boots. The `TRUNCATE` in each `beforeEach` is required for the suite to be repeatable.
+- **The E2E suite runs against `crypto_amazon_clon_api_test`**, not the dev database — `test/setup-env.ts` forces `NODE_ENV=test` and the database name before the `AppModule` boots. The `TRUNCATE` in each `beforeEach` is required for the suite to be repeatable.
 - **A test must fail without the fix.** Before trusting a regression test, verify it: several tests here looked like they covered a defect and passed either way (`isHealthPath`'s substring case picked the one URL that dodged the bug; the concurrent-POST test was caught by the pre-check, never reaching the `23505` translation).
 - Commit messages follow Conventional Commits with a **closed scope list** — see `commitlint.config.cjs` before inventing a scope. Adding a bounded context means adding its scope there.
 - **Pre-commit scans secrets.** lint-staged runs `secretlint` (preset recommend, `enableIDScanRule: true`) over **every** staged file via the catch-all `"*": "secretlint --maskSecrets"` entry — a detected secret blocks the commit before it enters history. Config is `.secretlintrc.json`; its contract lives in `src/__tests__/secretlint.spec.ts` (Tabla S, backlog #6).

@@ -10,10 +10,10 @@ body:
         todos:
 
         - **¿Es una vulnerabilidad?** No la publiques aquí. Lee
-          [`SECURITY.md`](https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/blob/main/SECURITY.md)
+          [`SECURITY.md`](https://github.com/JorgeIPN7/crypto-amazon-clon-api/blob/main/SECURITY.md)
           y repórtala en privado.
         - **¿Está ya decidido?**
-          [`docs/backlog.md`](https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/blob/main/docs/backlog.md)
+          [`docs/backlog.md`](https://github.com/JorgeIPN7/crypto-amazon-clon-api/blob/main/docs/backlog.md)
           es el gestor de incidencias real de este repositorio y registra el trabajo aplazado
           **con su criterio**, además de lo que se cerró tras verificar que no era un problema.
 

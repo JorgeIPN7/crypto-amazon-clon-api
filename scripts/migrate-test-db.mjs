@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
  * la letra y `pnpm test:e2e` reventaba con `relation "users" does not exist`.
  *
  * **Por qué un `.mjs` y no un prefijo de shell.** `.github/workflows/ci.yml` resuelve lo mismo
- * con `DB_DATABASE: nest_base_template_test` en el `env:` del step, y en Linux bastaría un
+ * con `DB_DATABASE: crypto_amazon_clon_api_test` en el `env:` del step, y en Linux bastaría un
  * `DB_DATABASE=… pnpm migration:run`. En los scripts de `package.json` ese prefijo NO funciona
  * en Windows —el entorno de referencia de este repo— y no hay `cross-env` en el árbol. Fijar la
  * variable en `process.env` antes de delegar funciona en los dos sistemas sin añadir una
@@ -25,7 +25,7 @@ import { spawnSync } from 'node:child_process';
  * los renombre a la vez.
  */
 
-process.env.DB_DATABASE = process.env.DB_DATABASE_TEST ?? 'nest_base_template_test';
+process.env.DB_DATABASE = process.env.DB_DATABASE_TEST ?? 'crypto_amazon_clon_api_test';
 
 console.log(`[db:migrate:test] migrando ${process.env.DB_DATABASE}`);
 

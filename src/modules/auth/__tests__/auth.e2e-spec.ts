@@ -16,7 +16,7 @@ const DEFAULT_PASSWORD = 'contrasena-larga-de-prueba';
  * alta escriba en las DOS tablas (perfil en `users`, credencial en `auth_credentials`), que
  * el login lea de ambas, y que la compensación deje el sistema sin perfiles huérfanos.
  *
- * Requiere la base levantada: `pnpm db:up`. Corre contra `nest_base_template_test`, no
+ * Requiere la base levantada: `pnpm db:up`. Corre contra `crypto_amazon_clon_api_test`, no
  * contra la base de desarrollo — lo fija `test/setup-env.ts`.
  */
 describe('Auth (e2e)', () => {
@@ -29,7 +29,7 @@ describe('Auth (e2e)', () => {
     dataSource = app.get(DataSource);
     // Saneo defensivo ANTES del primer test. El trigger que envenena `auth_credentials` es
     // fixture del `describe` de compensación, pero una muerte del worker ahí (Ctrl-C) lo deja
-    // vivo en `nest_base_template_test`, y entonces son los `it` de MÁS ARRIBA los que
+    // vivo en `crypto_amazon_clon_api_test`, y entonces son los `it` de MÁS ARRIBA los que
     // revientan con un 500 opaco: el `beforeEach` de aquel describe ya no llega a tiempo.
     // Sin esto la única salida era un `pnpm db:reset` a ciegas.
     await dropCompensationTriggerFixture();

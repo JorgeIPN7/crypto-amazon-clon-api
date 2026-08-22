@@ -7,4 +7,4 @@
 --
 -- El nombre va literal porque un `.sql` no interpola variables de entorno. Si cambias
 -- `DB_DATABASE`, cambia también este nombre y el de `test/setup-env.ts`.
-CREATE DATABASE nest_base_template_test;
+CREATE DATABASE crypto_amazon_clon_api_test;

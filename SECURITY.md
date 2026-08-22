@@ -11,10 +11,10 @@ discrepancia es un defecto de la página.
 **No abras un issue público.** Los issues de este repositorio son visibles para todo el que tenga
 acceso y no sirven para coordinar una divulgación.
 
-| Vía                                        | Cuándo                                               | Dónde                                                                                                               |
-| ------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| **GitHub Security Advisories** (preferida) | Siempre que tengas cuenta de GitHub y acceso al repo | [Reportar en privado](https://github.com/JorgeIPN7/template-nest-js-hexagonal-ddd-mudblood/security/advisories/new) |
-| Correo electrónico                         | Si no puedes usar la vía anterior                    | `jorge.ipn.7@gmail.com`                                                                                             |
+| Vía                                        | Cuándo                                               | Dónde                                                                                              |
+| ------------------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **GitHub Security Advisories** (preferida) | Siempre que tengas cuenta de GitHub y acceso al repo | [Reportar en privado](https://github.com/JorgeIPN7/crypto-amazon-clon-api/security/advisories/new) |
+| Correo electrónico                         | Si no puedes usar la vía anterior                    | `jorge.ipn.7@gmail.com`                                                                            |
 
 El aviso privado de GitHub es la vía preferida porque el hilo, el parche y el CVE viven en el
 mismo sitio, y porque permite discutir el fallo sin que sea público hasta que exista arreglo.

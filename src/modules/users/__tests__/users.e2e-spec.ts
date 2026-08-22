@@ -23,7 +23,7 @@ const DEFAULT_PASSWORD = 'contrasena-larga-de-prueba';
  * paginación, la desactivación y la autorización de los endpoints de `users` — que sigue
  * dependiendo de un token, y por eso el `beforeAll` se registra por `/auth/register`.
  *
- * Requiere la base levantada: `pnpm db:up`. Corre contra `nest_base_template_test`, no
+ * Requiere la base levantada: `pnpm db:up`. Corre contra `crypto_amazon_clon_api_test`, no
  * contra la base de desarrollo — lo fija `test/setup-env.ts`.
  */
 describe('Users (e2e)', () => {

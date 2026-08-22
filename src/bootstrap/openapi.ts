@@ -153,7 +153,7 @@ export function setupOpenApi(
       bundleUrl: `${base}/${fileName}`,
       documentUrl: `${base}/json`,
       nonce: String(res.locals.cspNonce ?? ''),
-      title: 'Nest Base Template API',
+      title: 'Amazon clon | Crypto API',
     });
     return apiReference(config)(req, res);
   });
