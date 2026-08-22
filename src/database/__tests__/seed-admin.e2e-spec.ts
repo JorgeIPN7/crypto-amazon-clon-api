@@ -9,7 +9,7 @@ import { createTestApp } from '@test/helpers/create-test-app';
 
 import { seedAdmin } from '../seeds/seed-admin';
 
-/** Cumple `ADMIN_PASSWORD: z.string().min(12)` de `env.schema`; el valor en sí es irrelevante. */
+/** Cumple `ADMIN_PASSWORD: z.string().min(8)` de `env.schema`; el valor en sí es irrelevante. */
 const ADMIN_PASSWORD = 'Password-Segura-1';
 const ADMIN_EMAIL = 'primer.admin@example.com';
 

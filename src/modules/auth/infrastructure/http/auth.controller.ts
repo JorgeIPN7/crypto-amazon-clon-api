@@ -202,7 +202,7 @@ export class AuthController {
     type: ValidationErrorResponseDto,
     example: errorExample(
       400,
-      'email must be a valid address, password must be longer than or equal to 12 characters',
+      'email must be a valid address, password must be longer than or equal to 8 characters',
       LOGIN_PATH,
     ),
   })

@@ -303,9 +303,9 @@ const build = () => {
 
 /**
  * Arbitrario CONSTRUIDO (nunca filtrado) de passwords dentro de los límites del DTO. La
- * longitud mínima de 12 evita el falso positivo de una cadena tan corta que aparezca por azar
+ * longitud mínima de 8 evita el falso positivo de una cadena tan corta que aparezca por azar
  * dentro del base64 del hash falso.
  */
 function passwordArb() {
-  return fc.stringMatching(/^[A-Za-z0-9!@#$%^&*-]{12,64}$/);
+  return fc.stringMatching(/^[A-Za-z0-9!@#$%^&*-]{8,64}$/);
 }

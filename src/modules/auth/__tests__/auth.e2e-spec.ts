@@ -8,7 +8,7 @@ import type { ErrorPayload } from '@common/filters/all-exceptions.filter';
 import { createTestApp } from '@test/helpers/create-test-app';
 import { resetThrottler } from '@test/helpers/reset-throttler';
 
-/** Cumple `@MinLength(12)` de `RegisterAccountDto`; el valor en sí es irrelevante. */
+/** Cumple `@MinLength(8)` de `RegisterAccountDto`; el valor en sí es irrelevante. */
 const DEFAULT_PASSWORD = 'contrasena-larga-de-prueba';
 
 /**

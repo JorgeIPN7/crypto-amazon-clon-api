@@ -97,7 +97,7 @@ const baseEnvSchema = z.object({
   // Par ambas-o-ninguna, como DOCS_USERNAME/DOCS_PASSWORD. `z.email()` y no
   // `z.string().email()`: la forma encadenada está deprecada en Zod 4.
   ADMIN_EMAIL: z.email().optional(),
-  ADMIN_PASSWORD: z.string().min(12).optional(),
+  ADMIN_PASSWORD: z.string().min(8).optional(),
 
   // `positive`, no `nonnegative`: con 0 el temporizador de gracia vence antes de que
   // `app.close()` resuelva y el proceso muere a mitad del cierre ordenado.

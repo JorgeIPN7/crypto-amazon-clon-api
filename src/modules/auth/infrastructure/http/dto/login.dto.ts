@@ -12,13 +12,13 @@ export class LoginDto {
   email!: string;
 
   @ApiProperty({
-    description: 'Contraseña en claro. Mismos límites que en el alta: entre 12 y 128 caracteres.',
+    description: 'Contraseña en claro. Mismos límites que en el alta: entre 8 y 128 caracteres.',
     example: 'una-frase-larga-y-dificil-de-adivinar',
-    minLength: 12,
+    minLength: 8,
     maxLength: 128,
   })
   @IsString()
-  @MinLength(12)
+  @MinLength(8)
   @MaxLength(128)
   password!: string;
 }

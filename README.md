@@ -163,7 +163,7 @@ El alta devuelve `201` con la forma `{ "success": true, "data": { "user": { … 
 | `GET /api/v1/users/:id` · `POST /api/v1/orders`  | cualquiera autenticado | `200`                     |
 | `GET /api/v1/users` · `DELETE /api/v1/users/:id` | rol `admin`            | **`403`**                 |
 
-El único camino a un admin es el seed. Añade la pareja al `.env` —**ambas o ninguna**, o la app no arranca; la contraseña exige 12 caracteres mínimo— y ejecútalo:
+El único camino a un admin es el seed. Añade la pareja al `.env` —**ambas o ninguna**, o la app no arranca; la contraseña exige 8 caracteres mínimo— y ejecútalo:
 
 ```bash
 # .env
@@ -283,11 +283,11 @@ La columna **¿Tocarla?** responde lo único que se suele preguntar: `No` = el d
 
 ### Auth
 
-| Variable                         | Default       | ¿Tocarla?    | Notas                                                                                                                                                                                                                                                                               |
-| -------------------------------- | ------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JWT_SECRET`                     | _(sin valor)_ | **Prod: sí** | **Obligatoria fuera de `development`/`test`**: en `staging`/`production` la app no arranca sin ella. Mínimo 32 caracteres. Sin definir en `development`/`test` cae a un secreto de desarrollo inseguro, publicado en el propio repositorio, y avisa por consola en cada arranque.   |
-| `JWT_EXPIRES_IN_S`               | `3600`        | Opcional     | Vigencia del access token, en segundos. No hay refresh token: al expirar, el cliente vuelve a `/auth/login`.                                                                                                                                                                        |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | _(sin valor)_ | Opcional     | Credenciales del primer admin, consumidas por `pnpm seed:admin` (nunca la app en marcha). Ambas o ninguna: definir solo una **impide el arranque** — la validación vive en el mismo `envSchema` que valida toda la app, no en el seed. `ADMIN_PASSWORD` exige 12 caracteres mínimo. |
+| Variable                         | Default       | ¿Tocarla?    | Notas                                                                                                                                                                                                                                                                              |
+| -------------------------------- | ------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JWT_SECRET`                     | _(sin valor)_ | **Prod: sí** | **Obligatoria fuera de `development`/`test`**: en `staging`/`production` la app no arranca sin ella. Mínimo 32 caracteres. Sin definir en `development`/`test` cae a un secreto de desarrollo inseguro, publicado en el propio repositorio, y avisa por consola en cada arranque.  |
+| `JWT_EXPIRES_IN_S`               | `3600`        | Opcional     | Vigencia del access token, en segundos. No hay refresh token: al expirar, el cliente vuelve a `/auth/login`.                                                                                                                                                                       |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | _(sin valor)_ | Opcional     | Credenciales del primer admin, consumidas por `pnpm seed:admin` (nunca la app en marcha). Ambas o ninguna: definir solo una **impide el arranque** — la validación vive en el mismo `envSchema` que valida toda la app, no en el seed. `ADMIN_PASSWORD` exige 8 caracteres mínimo. |
 
 ### PostgreSQL
 

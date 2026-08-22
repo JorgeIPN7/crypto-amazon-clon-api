@@ -30,13 +30,13 @@ export class RegisterAccountDto {
   name!: string;
 
   @ApiProperty({
-    description: 'Contraseña en claro. Entre 12 y 128 caracteres. Nunca se persiste tal cual.',
+    description: 'Contraseña en claro. Entre 8 y 128 caracteres. Nunca se persiste tal cual.',
     example: 'una-frase-larga-y-dificil-de-adivinar',
-    minLength: 12,
+    minLength: 8,
     maxLength: 128,
   })
   @IsString()
-  @MinLength(12)
+  @MinLength(8)
   @MaxLength(128)
   password!: string;
 }
