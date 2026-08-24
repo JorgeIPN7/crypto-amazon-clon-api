@@ -47,6 +47,33 @@
  * Lo que sí cambia es la forma del scope: los cuatro puertos que hoy son `abstract
  * class` pura ya no aparecen en el informe — cero mutantes, nada que auditar en ellos.
  *
+ * Remedición del 2026-08-22 (base común: `DomainError`, `UuidId`, `Entity` y `AggregateRoot`
+ * extendiendo `Entity`): **94.44 %** — 289 killed, 0 timeout, 17 survived, 0 sin cobertura,
+ * 5 error (289/306). El censo CRECE con fuerza: de 277 a 306 mutantes válidos, +29.
+ *
+ * Reparto medido: `shared` **100 %** (59/59), `modules` 93.12 % (230 killed, 17 survived) — y
+ * dentro de modules, `orders` 85.11 % (40/47) frente a `users`+`auth` 95.00 % (190/200).
+ *
+ * **El dato que importa aquí es que `shared` pasa de 23 mutantes a 59.** El kernel dejó de ser
+ * dos archivos pequeños y ahora carga con la identidad, la igualdad y las marcas de tiempo de
+ * los tres agregados — y entra al 100 %, sin un solo superviviente, porque cada pieza llegó con
+ * su tabla de casos acordada. Ese peso es el que sostiene el margen: `orders` en solitario está
+ * a 0.11 puntos del umbral (85.11), pero el global tiene 9.44 de holgura. Es exactamente lo que
+ * avisa la aritmética de más arriba: **medir un módulo aislado con `--mutate` NO dice a qué
+ * distancia está la CI de ponerse roja**, porque cada uno pesa según sus mutantes, no según su
+ * porcentaje.
+ *
+ * Los 17 survivors son los conocidos de siempre, ninguno nuevo: mensajes de error sin aserción
+ * de igualdad y condiciones de límite en value objects sin caso de propiedad exacto. Los 5
+ * `error` incluyen uno estructural nuevo — `domain-error.base.ts` genera un único mutante
+ * (vaciar el constructor) que revienta con `ReferenceError: Must call super constructor…` y
+ * queda fuera del denominador. No es laguna de cobertura: es que tres líneas de reenvío puro no
+ * dan superficie a los mutadores. ⚠️ Con la salvedad de que Stryker trata `NaN >= 85` como
+ * umbral cumplido: si `shared/domain/` se llenara de archivos así, el gate pasaría sin señal.
+ *
+ * El umbral se queda en 85 por el mismo criterio de siempre: subirlo a cuenta de un kernel que
+ * nace con casos frescos premiaría el momento, no la disciplina.
+ *
  * Remedición del 2026-08-07 (ciclo 4, `auth` como bounded context propio con la credencial):
  * **92.78 %** — 257 killed, 0 timeout, 20 survived, 0 sin cobertura, 8 error (257/277). Sube
  * 1.3 puntos y el censo CRECE por primera vez en el refactor: +54 mutantes válidos, todos del

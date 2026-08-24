@@ -331,6 +331,47 @@ PostgreSQL through TypeORM. Config lives in `src/config/database.config.ts`, wir
 contract — with the code deploy in between. Never in the same release.** Additive migrations
 (`CREATE TABLE`, `ADD COLUMN`) need none of this: old code ignores what it doesn't know.
 
+**⚠️ Excepción a la frase anterior, y es la que muerde: una columna nueva sin `DEFAULT` solo
+puede nacer `NOT NULL` si NINGUNA versión desplegada inserta en esa tabla sin nombrarla.**
+«Aditiva ⇒ no necesita expand/contract» es cierto para las **lecturas** y para columnas nullable
+o con `DEFAULT`; deja de serlo en cuanto la misma migración endurece a `NOT NULL`, porque
+entonces el problema se muda del `SELECT` al `INSERT`, y el código viejo no ignora una columna
+que el motor le exige nombrar. Medido al dar a `orders` sus `created_at` / `updated_at`, contra
+la base real ya migrada:
+
+```
+INSERT INTO orders (id, customer_id, concept, amount_cents, placed_at) VALUES (...);
+-- ERROR: null value in column "created_at" of relation "orders" violates not-null constraint
+```
+
+Ese `INSERT` de cinco columnas no es hipotético: es exactamente el que emite TypeORM con la
+entidad anterior, porque enumera solo las columnas que la entidad mapea (mismo hecho que el
+`SELECT` del final de esta sección, visto desde el otro lado). Con `DB_MIGRATIONS_RUN=true` la
+migración corre al arrancar el primer pod nuevo y, desde ese instante, las réplicas viejas dejan
+de poder escribir en esa tabla: `POST /orders` responde 500 hasta que acabe el rodado.
+
+Es el caso **simétrico** del `DROP NOT NULL` del expand que se explica más abajo — allí una
+columna que el código NUEVO deja de escribir tiene que perder su `NOT NULL`; aquí una columna
+que el código VIEJO todavía no escribe no puede nacer con él. Tres salidas, por este orden:
+
+1. **Nacer con `DEFAULT`** — la más barata. ⚠️ **Salvo para marcas de tiempo**, donde `DEFAULT
+now()` mete un segundo reloj en el sistema: aquí el instante lo pone el dominio con el `now`
+   que le inyecta el caso de uso, y por eso `orders` no lo usa (ver el JSDoc de
+   `1786076763455-create-orders-and-outbox.ts` y el de `order.orm-entity.ts`).
+2. **Nacer nullable**, y endurecerla más tarde si de verdad hace falta.
+3. **Partir en expand + contract**: expand añade la columna nullable y rellena las filas
+   existentes; contract hace el `SET NOT NULL` **precedido de un relleno
+   `WHERE … IS NULL`** para las filas que las réplicas viejas insertaron durante la ventana —
+   sin ese segundo relleno, el contract falla en producción.
+
+⚠️ **De dónde sale el relleno importa tanto como el relleno.** Se copia de una columna que ya
+tiene el dato correcto, nunca de `now()`: rellenar con la hora de la migración escribe un dato
+falso en todas las filas históricas. Cuando `orders` recibió sus marcas, el relleno salió de
+`placed_at`, porque para una orden ya existente el momento de creación **es** el de colocación.
+
+Si ninguna versión desplegada inserta sin nombrar la columna —una tabla que nace en esa misma
+migración, por ejemplo— el `NOT NULL` va en el `CREATE TABLE` y no hay nada que partir.
+
 | Step         | Contains                                                                                                          | Safe while old replicas serve traffic |
 | ------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | **Expand**   | `CREATE TABLE` / `ADD COLUMN`, indexes, the data copy, and `DROP NOT NULL` on whatever the new code stops writing | Yes — that is the entire point        |
