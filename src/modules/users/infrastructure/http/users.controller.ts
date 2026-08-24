@@ -7,11 +7,14 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
+import type { AuthenticatedUser } from '@common/auth/authenticated-user';
 import { ApiStandardErrors } from '@common/decorators/api-standard-errors.decorator';
 import { Auth } from '@common/decorators/auth.decorator';
+import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { ApiEnvelope, ApiPaginatedEnvelope } from '@common/dto/api-envelope.dto';
-import { buildErrorExample } from '@common/dto/error-example.factory';
+import { TIMESTAMP } from '@common/dto/error-example.factory';
 import { ErrorResponseDto, ValidationErrorResponseDto } from '@common/dto/error-response.dto';
+import { errorExample, requestMeta } from '@common/dto/openapi-example.helpers';
 import { PaginatedResponseDto } from '@common/dto/paginated-response.dto';
 import { PaginationDto } from '@common/dto/pagination.dto';
 
@@ -28,40 +31,15 @@ const USER_ID_EXAMPLE = '9d2a1c7e-1f6b-4a2e-9c3d-77a1b0e5f012';
 const COLLECTION_PATH = '/api/v1/users';
 const ITEM_PATH = `${COLLECTION_PATH}/${USER_ID_EXAMPLE}`;
 
-/** Lo que `TransformInterceptor` añade a toda respuesta de éxito. */
-const requestMeta = (path: string) => ({
-  timestamp: '2026-08-01T10:15:00.000Z',
-  path,
-  requestId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
-});
-
 const USER_EXAMPLE = {
   id: USER_ID_EXAMPLE,
   email: 'maria.gonzalez@empresa.com.mx',
   name: 'María González',
   role: 'user',
   active: true,
-  createdAt: '2026-08-01T10:15:00.000Z',
-  updatedAt: '2026-08-01T10:15:00.000Z',
+  createdAt: TIMESTAMP,
+  updatedAt: TIMESTAMP,
 } as const;
-
-/**
- * Cuerpo de error tal y como lo emite `AllExceptionsFilter`, no como lo lanza el dominio.
- *
- * `error` sale de `body.error ?? exception.name`, y `UserDomainExceptionFilter` traduce el error
- * de dominio a una excepción de Nest **construida con un string**: `new NotFoundException(msg)`
- * produce `{ statusCode, message: msg, error: 'Not Found' }`. Es decir, el nombre de la clase de
- * dominio nunca llega al cliente — medido, no supuesto. Documentar `error: 'UserNotFoundError'`
- * habría publicado un discriminante que ningún cliente puede observar.
- */
-/**
- * Los ejemplos de error salen de la factoria comun, que deriva `error` del status en vez de
- * recibirlo. Escribirlo a mano fue el origen de dos ficciones en la primera version de este
- * archivo: anunciaba `EmailAlreadyTakenError` y `UserNotFoundError`, cuando el filtro publica
- * los nombres canonicos `Conflict` y `Not Found`.
- */
-const errorExample = (statusCode: number, message: string, path: string) =>
-  buildErrorExample(statusCode, { path, message });
 
 /**
  * Adaptador de entrada (driver). No contiene reglas de negocio: valida el transporte,
@@ -220,8 +198,18 @@ export class UsersController {
     ),
   })
   @ApiStandardErrors()
-  async deactivate(@Param('id') id: string): Promise<UserResponseDto> {
-    const user = await this.deactivateUser.execute({ userId: id });
+  // El actor de la auditoría sale del `sub` del token y JAMÁS de la ruta ni del body — mismo
+  // criterio anti-spoof que `OrdersController` con `customerId`, que es el precedente. No añade
+  // nada al documento OpenAPI: `@CurrentUser()` es un `createParamDecorator` puro, sin metadatos
+  // de swagger, así que la operación publicada no cambia (lo comprueba `openapi-contract`).
+  //
+  // El endpoint es `@Auth('admin')`, así que aquí `user.sub` nunca es `null`: el guard ya
+  // rechazó a quien no trae token. El `null` del tipo es para llamantes sin HTTP delante.
+  async deactivate(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ): Promise<UserResponseDto> {
+    const user = await this.deactivateUser.execute({ userId: id, by: actor.sub });
     return UserResponseDto.fromDomain(user);
   }
 }

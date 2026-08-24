@@ -12,8 +12,9 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiStandardErrors } from '@common/decorators/api-standard-errors.decorator';
 import { Public } from '@common/decorators/public.decorator';
 import { ApiEnvelope } from '@common/dto/api-envelope.dto';
-import { buildErrorExample } from '@common/dto/error-example.factory';
+import { TIMESTAMP } from '@common/dto/error-example.factory';
 import { ErrorResponseDto, ValidationErrorResponseDto } from '@common/dto/error-response.dto';
+import { errorExample, requestMeta } from '@common/dto/openapi-example.helpers';
 
 import { LoginUseCase } from '../../application/use-cases/login.use-case';
 import { RegisterAccountUseCase } from '../../application/use-cases/register-account.use-case';
@@ -27,26 +28,15 @@ import { RegisteredAccountResponseDto } from './dto/registered-account-response.
 const LOGIN_PATH = '/api/v1/auth/login';
 const REGISTER_PATH = '/api/v1/auth/register';
 
-/** Lo que `TransformInterceptor` añade a toda respuesta de éxito. */
-const requestMeta = (path: string) => ({
-  timestamp: '2026-08-01T10:15:00.000Z',
-  path,
-  requestId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
-});
-
 const ACCOUNT_EXAMPLE = {
   id: '9d2a1c7e-1f6b-4a2e-9c3d-77a1b0e5f012',
   email: 'maria.gonzalez@empresa.com.mx',
   name: 'María González',
   role: 'user',
   active: true,
-  createdAt: '2026-08-01T10:15:00.000Z',
-  updatedAt: '2026-08-01T10:15:00.000Z',
+  createdAt: TIMESTAMP,
+  updatedAt: TIMESTAMP,
 } as const;
-
-/** Los ejemplos de error salen SIEMPRE de la factoría: `error` se deriva del status. */
-const errorExample = (statusCode: number, message: string, path: string) =>
-  buildErrorExample(statusCode, { path, message });
 
 /**
  * Adaptador de entrada (driver) del bounded context. No verifica credenciales ni crea nada:

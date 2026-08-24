@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { TIMESTAMP } from '@common/dto/error-example.factory';
+
 import type { Order } from '../../../domain/entities/order.entity';
 
 export class OrderResponseDto {
@@ -27,7 +29,7 @@ export class OrderResponseDto {
   // medido que documenta `user-response.dto.ts`.
   @ApiProperty({
     description: 'Momento en que se colocó la orden, en UTC.',
-    example: '2026-08-01T10:15:00.000Z',
+    example: TIMESTAMP,
     type: String,
     format: 'date-time',
   })

@@ -12,8 +12,9 @@ import { ApiStandardErrors } from '@common/decorators/api-standard-errors.decora
 import { Auth } from '@common/decorators/auth.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { ApiEnvelope } from '@common/dto/api-envelope.dto';
-import { buildErrorExample } from '@common/dto/error-example.factory';
+import { TIMESTAMP } from '@common/dto/error-example.factory';
 import { ErrorResponseDto, ValidationErrorResponseDto } from '@common/dto/error-response.dto';
+import { errorExample, requestMeta } from '@common/dto/openapi-example.helpers';
 
 import { PlaceOrderUseCase } from '../../application/use-cases/place-order.use-case';
 
@@ -23,24 +24,13 @@ import { OrdersDomainExceptionFilter } from './orders-domain-exception.filter';
 
 const COLLECTION_PATH = '/api/v1/orders';
 
-/** Lo que `TransformInterceptor` añade a toda respuesta de éxito — mismos valores fijos que users. */
-const requestMeta = (path: string) => ({
-  timestamp: '2026-08-01T10:15:00.000Z',
-  path,
-  requestId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
-});
-
 const ORDER_EXAMPLE = {
   id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
   customerId: '9d2a1c7e-1f6b-4a2e-9c3d-77a1b0e5f012',
   concept: 'Suscripción anual plan Pro',
   amountCents: 149_900,
-  placedAt: '2026-08-01T10:15:00.000Z',
+  placedAt: TIMESTAMP,
 } as const;
-
-/** Los ejemplos de error salen SIEMPRE de la factoría: `error` se deriva del status. */
-const errorExample = (statusCode: number, message: string, path: string) =>
-  buildErrorExample(statusCode, { path, message });
 
 /**
  * Adaptador de entrada. Primer consumidor real de `@CurrentUser()`: el `customerId` sale
