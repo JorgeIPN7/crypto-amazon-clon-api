@@ -7,6 +7,11 @@ import { UserId } from '../../../domain/value-objects/user-id.vo';
 
 const NOW = new Date('2026-07-27T10:00:00.000Z');
 const LATER = new Date('2026-07-27T11:00:00.000Z');
+// Dos actores distintos y ninguno centinela: son ids de usuario, que es lo que el `sub` de un
+// token trae. Separarlos es lo que permite distinguir «quién creó» de «quién tocó por última
+// vez» — con un solo valor, un mutador que reescribiera `createdBy` pasaría inadvertido.
+const CREATOR = '3f1a9b2c-8d4e-4f6a-9b1c-2e5d7a0f3b48';
+const EDITOR = '5b7c2d4e-9a1f-4c3b-8e6d-0f2a4b6c8d1e';
 
 describe('User', () => {
   describe('create()', () => {
@@ -81,6 +86,27 @@ describe('User', () => {
       // Assert
       expect(user).not.toHaveProperty('passwordHash');
     });
+
+    // Caso nuevo de esta fase. Fija la simetría que se decidió al escribir `create`: los dos
+    // actores nacen valiendo lo mismo, igual que las dos fechas. `updatedBy: null` al nacer
+    // diría que la fila no la ha tocado nadie, y sí la tocó quien la creó.
+    it('debería nacer con createdBy y updatedBy iguales al actor recibido', () => {
+      // Act
+      const user = buildUser();
+
+      // Assert
+      expect(user.createdBy).toBe(CREATOR);
+      expect(user.updatedBy).toBe(CREATOR);
+    });
+
+    it('debería aceptar null como actor: es el sistema, no un hueco', () => {
+      // Act — el camino real del alta pública, que es `@Public()` y no tiene `sub`.
+      const user = buildUser({ createdBy: null });
+
+      // Assert
+      expect(user.createdBy).toBeNull();
+      expect(user.updatedBy).toBeNull();
+    });
   });
 
   describe('rename()', () => {
@@ -89,7 +115,7 @@ describe('User', () => {
       const user = buildUser();
 
       // Act
-      user.rename('Nuevo Nombre', LATER);
+      user.rename('Nuevo Nombre', LATER, EDITOR);
 
       // Assert
       expect(user.name).toBe('Nuevo Nombre');
@@ -97,14 +123,28 @@ describe('User', () => {
       expect(user.createdAt).toEqual(NOW);
     });
 
+    it('debería registrar en updatedBy al actor que renombra, sin tocar createdBy', () => {
+      // Arrange
+      const user = buildUser();
+
+      // Act
+      user.rename('Nuevo Nombre', LATER, EDITOR);
+
+      // Assert
+      expect(user.updatedBy).toBe(EDITOR);
+      expect(user.createdBy).toBe(CREATOR);
+    });
+
     it('debería rechazar un nombre inválido sin alterar el estado', () => {
       // Arrange
       const user = buildUser({ name: 'Nombre Original' });
 
       // Act + Assert
-      expect(() => user.rename('x', LATER)).toThrow(InvalidUserNameError);
+      expect(() => user.rename('x', LATER, EDITOR)).toThrow(InvalidUserNameError);
       expect(user.name).toBe('Nombre Original');
       expect(user.updatedAt).toEqual(NOW);
+      // La traza tampoco se mueve: `assertName` lanza ANTES del `touch`.
+      expect(user.updatedBy).toBe(CREATOR);
     });
   });
 
@@ -114,11 +154,22 @@ describe('User', () => {
       const user = buildUser();
 
       // Act
-      user.changeEmail(Email.from('nuevo@example.com'), LATER);
+      user.changeEmail(Email.from('nuevo@example.com'), LATER, EDITOR);
 
       // Assert
       expect(user.email.value).toBe('nuevo@example.com');
       expect(user.updatedAt).toEqual(LATER);
+    });
+
+    it('debería registrar en updatedBy al actor que cambia el email', () => {
+      // Arrange
+      const user = buildUser();
+
+      // Act
+      user.changeEmail(Email.from('nuevo@example.com'), LATER, EDITOR);
+
+      // Assert
+      expect(user.updatedBy).toBe(EDITOR);
     });
 
     it('debería ser idempotente cuando el email no cambia', () => {
@@ -126,10 +177,13 @@ describe('User', () => {
       const user = buildUser({ email: 'same@example.com' });
 
       // Act
-      user.changeEmail(Email.from('SAME@example.com'), LATER);
+      user.changeEmail(Email.from('SAME@example.com'), LATER, EDITOR);
 
       // Assert
       expect(user.updatedAt).toEqual(NOW);
+      // El corte en seco es anterior al `touch`, así que el actor tampoco se reescribe: la
+      // traza sigue nombrando a quien la tocó de verdad.
+      expect(user.updatedBy).toBe(CREATOR);
     });
   });
 
@@ -139,24 +193,37 @@ describe('User', () => {
       const user = buildUser();
 
       // Act
-      user.deactivate(LATER);
+      user.deactivate(LATER, EDITOR);
 
       // Assert
       expect(user.active).toBe(false);
       expect(user.updatedAt).toEqual(LATER);
     });
 
+    it('debería registrar en updatedBy al actor que desactiva', () => {
+      // Arrange
+      const user = buildUser();
+
+      // Act
+      user.deactivate(LATER, EDITOR);
+
+      // Assert
+      expect(user.updatedBy).toBe(EDITOR);
+    });
+
     it('debería ser idempotente si ya está inactivo', () => {
       // Arrange
       const user = buildUser();
-      user.deactivate(LATER);
+      user.deactivate(LATER, EDITOR);
       const afterFirst = user.updatedAt;
 
       // Act
-      user.deactivate(new Date('2026-07-27T12:00:00.000Z'));
+      user.deactivate(new Date('2026-07-27T12:00:00.000Z'), CREATOR);
 
       // Assert
       expect(user.updatedAt).toEqual(afterFirst);
+      // Un segundo actor distinto tampoco entra: sin transición no hay `touch`.
+      expect(user.updatedBy).toBe(EDITOR);
     });
   });
 
@@ -164,13 +231,35 @@ describe('User', () => {
     it('debería reactivar a un usuario desactivado', () => {
       // Arrange
       const user = buildUser();
-      user.deactivate(LATER);
+      user.deactivate(LATER, EDITOR);
+      const reactivatedAt = new Date('2026-07-27T12:00:00.000Z');
 
       // Act
-      user.activate(new Date('2026-07-27T12:00:00.000Z'));
+      user.activate(reactivatedAt, CREATOR);
 
       // Assert
+      // La aserción sobre `updatedAt` no es simetría con `deactivate()`: sin ella este `it`
+      // pasa aunque `activate()` deje de sellar la fecha por completo. Medido — quitando su
+      // `touch(now)`, los 115 tests del módulo seguían en verde, y era el único de los cinco
+      // mutadores sin ninguna comprobación de la marca de tiempo.
       expect(user.active).toBe(true);
+      expect(user.updatedAt).toBe(reactivatedAt);
+    });
+
+    // El actor de la reactivación (EDITOR) es distinto del que creó el usuario (CREATOR) Y del
+    // que lo desactivó (CREATOR). Con los tres iguales —como estaba escrito en el primer
+    // intento— este caso pasaba en verde aunque `touch` ignorase el `by` por completo:
+    // comprobado rompiendo `touch` y viéndolo sobrevivir.
+    it('debería registrar en updatedBy al actor que reactiva', () => {
+      // Arrange
+      const user = buildUser();
+      user.deactivate(LATER, CREATOR);
+
+      // Act
+      user.activate(new Date('2026-07-27T12:00:00.000Z'), EDITOR);
+
+      // Assert — el actor de la reactivación reemplaza al de la desactivación.
+      expect(user.updatedBy).toBe(EDITOR);
     });
 
     it('debería ser idempotente si ya está activo', () => {
@@ -178,10 +267,11 @@ describe('User', () => {
       const user = buildUser();
 
       // Act
-      user.activate(LATER);
+      user.activate(LATER, EDITOR);
 
       // Assert
       expect(user.updatedAt).toEqual(NOW);
+      expect(user.updatedBy).toBe(CREATOR);
     });
   });
 
@@ -192,11 +282,23 @@ describe('User', () => {
       const later = new Date('2026-08-05T12:00:00Z');
 
       // Act
-      user.promoteToAdmin(later);
+      user.promoteToAdmin(later, EDITOR);
 
       // Assert
       expect(user.role).toBe('admin');
       expect(user.toSnapshot().updatedAt).toEqual(later);
+    });
+
+    it('debería registrar en updatedBy al actor que promueve', () => {
+      // Arrange
+      const user = buildUser();
+
+      // Act
+      user.promoteToAdmin(new Date('2026-08-05T12:00:00Z'), EDITOR);
+
+      // Assert
+      expect(user.toSnapshot().updatedBy).toBe(EDITOR);
+      expect(user.toSnapshot().createdBy).toBe(CREATOR);
     });
 
     it('debería ser idempotente la promoción repetida', () => {
@@ -204,14 +306,15 @@ describe('User', () => {
       const user = buildUser();
       const first = new Date('2026-08-05T12:00:00Z');
       const second = new Date('2026-08-05T13:00:00Z');
-      user.promoteToAdmin(first);
+      user.promoteToAdmin(first, EDITOR);
 
       // Act
-      user.promoteToAdmin(second);
+      user.promoteToAdmin(second, CREATOR);
 
       // Assert
       expect(user.role).toBe('admin');
       expect(user.toSnapshot().updatedAt).toEqual(first);
+      expect(user.toSnapshot().updatedBy).toBe(EDITOR);
     });
   });
 
@@ -257,6 +360,8 @@ describe('User', () => {
         active: false,
         createdAt: NOW,
         updatedAt: LATER,
+        createdBy: CREATOR,
+        updatedBy: EDITOR,
       };
 
       // Act
@@ -265,6 +370,28 @@ describe('User', () => {
       // Assert
       expect(user.name).toBe('A');
       expect(user.active).toBe(false);
+    });
+
+    // Los dos actores llegan por separado desde la fila, y `rehydrate` no puede colapsarlos en
+    // uno: en persistencia SIEMPRE pueden diferir, y de hecho difieren en cuanto alguien
+    // desactiva a un usuario que se registró solo (`createdBy` NULL, `updatedBy` el admin).
+    it('debería conservar createdBy y updatedBy por separado al reconstituir', () => {
+      // Act
+      const user = User.rehydrate({
+        id: UserId.generate(),
+        email: Email.from('legacy@example.com'),
+        name: 'Usuario Heredado',
+        role: 'user',
+        active: true,
+        createdAt: NOW,
+        updatedAt: LATER,
+        createdBy: null,
+        updatedBy: EDITOR,
+      });
+
+      // Assert
+      expect(user.createdBy).toBeNull();
+      expect(user.updatedBy).toBe(EDITOR);
     });
   });
 
@@ -339,12 +466,17 @@ describe('User', () => {
 
 // Helpers
 
-const buildUser = (overrides: { email?: string; name?: string } = {}): User =>
+const buildUser = (
+  overrides: { email?: string; name?: string; createdBy?: string | null } = {},
+): User =>
   User.create({
     id: UserId.generate(),
     email: Email.from(overrides.email ?? 'maria@example.com'),
     name: overrides.name ?? 'María González',
     now: NOW,
+    // `?? CREATOR` no sirve aquí: `null` es un valor legítimo del campo y `??` lo tragaría,
+    // dejando el caso del sistema inalcanzable desde el factory.
+    createdBy: 'createdBy' in overrides ? (overrides.createdBy ?? null) : CREATOR,
   });
 
 /** Arbitrario CONSTRUIDO (no filtrado): roles y promociones desde constantes. */
@@ -354,7 +486,7 @@ function userArbitrary() {
     .map(({ name, promote }) => {
       const user = buildUser({ email: 'arb@example.com', name });
       if (promote) {
-        user.promoteToAdmin(LATER);
+        user.promoteToAdmin(LATER, EDITOR);
       }
       return user;
     });

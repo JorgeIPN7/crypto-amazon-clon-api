@@ -66,6 +66,7 @@ describe('AuthController', () => {
         userId: user.id,
         passwordHash: PasswordHash.from(fakeHashOf('contrasena-larga-de-prueba')),
         now: new Date('2026-08-07T10:00:00.000Z'),
+        createdBy: null,
       });
       const { controller } = build({ users: [user], credentials: [credential] });
 
@@ -90,6 +91,7 @@ describe('AuthController', () => {
         userId: user.id,
         passwordHash: PasswordHash.from(fakeHashOf('contrasena-larga-de-prueba')),
         now: new Date('2026-08-07T10:00:00.000Z'),
+        createdBy: null,
       });
       const { controller } = build({ users: [user], credentials: [credential] });
 

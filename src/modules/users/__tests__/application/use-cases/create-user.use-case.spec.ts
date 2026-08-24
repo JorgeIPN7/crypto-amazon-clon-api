@@ -118,15 +118,39 @@ describe('CreateUserUseCase', () => {
 
       // Assert
       expect(user).not.toHaveProperty('passwordHash');
+      // La lista es EXACTA a propósito: un campo nuevo del agregado no entra al snapshot sin
+      // que este caso se ponga rojo. `createdBy`/`updatedBy` entraron así, decididos.
       expect(Object.keys(user.toSnapshot()).sort()).toEqual([
         'active',
         'createdAt',
+        'createdBy',
         'email',
         'id',
         'name',
         'role',
         'updatedAt',
+        'updatedBy',
       ]);
+    });
+
+    /**
+     * El único camino que llega hasta aquí es `UsersFacadeImpl.createProfile`, y a esa la llama
+     * solo `RegisterAccountUseCase` desde `POST /auth/register`, que es `@Public()`: no hay
+     * token, no hay `sub`, no hay actor. `null` = el sistema, y NO un centinela `'system'`.
+     *
+     * Este caso es lo que se pone rojo el día que alguien rellene `createdBy` con el id del
+     * propio usuario recién creado —la tentación obvia— sin decidirlo.
+     */
+    it('debería crear el perfil sin actor: el alta pública la firma el sistema', async () => {
+      // Arrange
+      const { useCase } = buildUseCase();
+
+      // Act
+      const user = await useCase.execute({ email: 'sistema@example.com', name: 'Ana López' });
+
+      // Assert
+      expect(user.createdBy).toBeNull();
+      expect(user.updatedBy).toBeNull();
     });
   });
 });

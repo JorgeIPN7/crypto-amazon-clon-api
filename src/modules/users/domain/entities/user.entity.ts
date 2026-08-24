@@ -1,3 +1,5 @@
+import { Entity, type AuditTrail } from '@shared/domain/entity.base';
+
 import type { Email } from '../value-objects/email.vo';
 import { InvalidUserNameError } from '../errors/user.errors';
 import type { UserId } from '../value-objects/user-id.vo';
@@ -14,32 +16,67 @@ export type UserSnapshot = {
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 };
 
 /**
  * Raíz del agregado. Sin decoradores, sin ORM y sin dependencias de framework: sus
- * invariantes se garantizan en el constructor y en los métodos, no en un validador
- * externo. El adaptador de persistencia lo traduce desde y hacia la fila de la tabla.
+ * invariantes se garantizan en el constructor y en los métodos, no en un validador externo.
+ * El adaptador de persistencia lo traduce desde y hacia la fila de la tabla.
+ *
+ * `id` y la traza de auditoría (`createdAt`, `updatedAt`, `createdBy`, `updatedBy`) los pone
+ * `Entity`, junto con `equals()` y `touch()`. Las dos fechas estaban escritas a mano aquí y en
+ * los otros dos agregados; los dos actores son capacidad NUEVA y no existían en ninguno.
+ *
+ * **Los cinco mutadores reciben `by` y ninguno lo puede omitir.** `touch(now, by)` lo exige, así
+ * que un mutador que se olvidara del actor no compila. `by` es `string | null` —el id del actor
+ * o `null` para el sistema— y NO un `UserId`: aquí sí podría serlo (este es el contexto dueño
+ * del identificador), pero el campo lo declara `AuditTrail` en `shared/`, que no puede importar
+ * de `modules/`. Un tipo distinto por agregado sería peor que uno común: rompería el round-trip
+ * con la fila, que es una columna `varchar` para las tres tablas.
  *
  * **Sin `passwordHash` desde el ciclo 4.** El usuario es un PERFIL: identidad, nombre, rol y
  * vigencia. La credencial es el agregado `Credential` del bounded context `auth`, con su
  * propia tabla. El corte no es estético — mientras el hash vivía aquí, cualquier consulta de
  * perfil arrastraba el secreto y cualquier `toSnapshot()` podía filtrarlo.
  */
-export class User {
+export class User extends Entity<UserId> {
+  /**
+   * Recibe la `AuditTrail` entera y no las marcas sueltas. Con cuatro campos, la alternativa
+   * eran nueve parámetros posicionales seguidos de `Date, Date, string|null, string|null` — la
+   * clase exacta de bug que `CLAUDE.md` evita en los casos de uso con entradas nombradas.
+   */
   private constructor(
-    readonly id: UserId,
+    id: UserId,
     private _email: Email,
     private _name: string,
     private _role: UserRole,
     private _active: boolean,
-    readonly createdAt: Date,
-    private _updatedAt: Date,
-  ) {}
+    audit: AuditTrail,
+  ) {
+    super(id, audit);
+  }
 
-  static create(params: { id: UserId; email: Email; name: string; now: Date }): User {
+  /**
+   * `updatedBy` nace igual a `createdBy`, por la misma simetría que hace que `updatedAt` nazca
+   * igual a `createdAt`: quien creó la fila es, hasta el primer `touch()`, el último que la
+   * escribió. Ponerlo a `null` diría que nadie la ha tocado nunca, y sería falso.
+   */
+  static create(params: {
+    id: UserId;
+    email: Email;
+    name: string;
+    now: Date;
+    createdBy: string | null;
+  }): User {
     const name = User.assertName(params.name);
-    return new User(params.id, params.email, name, 'user', true, params.now, params.now);
+    return new User(params.id, params.email, name, 'user', true, {
+      createdAt: params.now,
+      updatedAt: params.now,
+      createdBy: params.createdBy,
+      updatedBy: params.createdBy,
+    });
   }
 
   /** Reconstituye el agregado desde persistencia sin volver a aplicar reglas de creación. */
@@ -51,16 +88,15 @@ export class User {
     active: boolean;
     createdAt: Date;
     updatedAt: Date;
+    createdBy: string | null;
+    updatedBy: string | null;
   }): User {
-    return new User(
-      params.id,
-      params.email,
-      params.name,
-      params.role,
-      params.active,
-      params.createdAt,
-      params.updatedAt,
-    );
+    return new User(params.id, params.email, params.name, params.role, params.active, {
+      createdAt: params.createdAt,
+      updatedAt: params.updatedAt,
+      createdBy: params.createdBy,
+      updatedBy: params.updatedBy,
+    });
   }
 
   get email(): Email {
@@ -79,46 +115,47 @@ export class User {
     return this._active;
   }
 
-  get updatedAt(): Date {
-    return this._updatedAt;
-  }
-
-  rename(name: string, now: Date): void {
+  rename(name: string, now: Date, by: string | null): void {
     this._name = User.assertName(name);
-    this._updatedAt = now;
+    this.touch(now, by);
   }
 
-  changeEmail(email: Email, now: Date): void {
+  changeEmail(email: Email, now: Date, by: string | null): void {
     if (this._email.equals(email)) {
       return;
     }
     this._email = email;
-    this._updatedAt = now;
+    this.touch(now, by);
   }
 
-  deactivate(now: Date): void {
+  deactivate(now: Date, by: string | null): void {
     if (!this._active) {
       return;
     }
     this._active = false;
-    this._updatedAt = now;
+    this.touch(now, by);
   }
 
-  activate(now: Date): void {
+  activate(now: Date, by: string | null): void {
     if (this._active) {
       return;
     }
     this._active = true;
-    this._updatedAt = now;
+    this.touch(now, by);
   }
 
-  /** Único camino de dominio hacia admin. Idempotente: repetirlo no toca updatedAt. */
-  promoteToAdmin(now: Date): void {
+  /**
+   * Único camino de dominio hacia admin. Idempotente: repetirlo no toca `updatedAt` — ni, desde
+   * esta fase, `updatedBy`. El corte en seco es anterior al `touch`, así que una promoción
+   * repetida tampoco reescribe el actor: la traza sigue nombrando a quien la promovió de verdad.
+   * Lo mismo vale para los otros tres mutadores idempotentes.
+   */
+  promoteToAdmin(now: Date, by: string | null): void {
     if (this._role === 'admin') {
       return;
     }
     this._role = 'admin';
-    this._updatedAt = now;
+    this.touch(now, by);
   }
 
   toSnapshot(): UserSnapshot {
@@ -129,7 +166,9 @@ export class User {
       role: this._role,
       active: this._active,
       createdAt: this.createdAt,
-      updatedAt: this._updatedAt,
+      updatedAt: this.updatedAt,
+      createdBy: this.createdBy,
+      updatedBy: this.updatedBy,
     };
   }
 

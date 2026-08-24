@@ -216,6 +216,7 @@ const buildCredentialFor = (userId: string, password: string): Credential =>
     userId,
     passwordHash: PasswordHash.from(fakeHashOf(password)),
     now: new Date('2026-08-07T10:00:00.000Z'),
+    createdBy: null,
   });
 
 /** Los cuatro caminos de fallo, todos con el MISMO email y el MISMO password de entrada. */

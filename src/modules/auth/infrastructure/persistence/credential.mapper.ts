@@ -1,4 +1,5 @@
 import { Credential } from '../../domain/entities/credential.entity';
+import { CredentialId } from '../../domain/value-objects/credential-id.vo';
 import { PasswordHash } from '../../domain/value-objects/password-hash.vo';
 
 import { CredentialOrmEntity } from './credential.orm-entity';
@@ -15,11 +16,13 @@ import { CredentialOrmEntity } from './credential.orm-entity';
 export const CredentialMapper = {
   toDomain(row: CredentialOrmEntity): Credential {
     return Credential.rehydrate({
-      id: row.id,
+      id: CredentialId.from(row.id),
       userId: row.userId,
       passwordHash: PasswordHash.from(row.passwordHash),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      createdBy: row.createdBy,
+      updatedBy: row.updatedBy,
     });
   },
 
@@ -31,6 +34,8 @@ export const CredentialMapper = {
     row.passwordHash = snapshot.passwordHash;
     row.createdAt = snapshot.createdAt;
     row.updatedAt = snapshot.updatedAt;
+    row.createdBy = snapshot.createdBy;
+    row.updatedBy = snapshot.updatedBy;
     return row;
   },
 };

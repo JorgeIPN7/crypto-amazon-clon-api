@@ -17,6 +17,8 @@ import { UserOrmEntity } from '../../../infrastructure/persistence/user.orm-enti
  * motor —el índice único, los tipos de columna, el código de error del driver—, y un doble
  * lo sustituiría por lo que uno cree que hace.
  */
+const ACTOR_ID = '5b7c2d4e-9a1f-4c3b-8e6d-0f2a4b6c8d1e';
+
 describe('UserTypeOrmRepository (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
@@ -83,6 +85,8 @@ describe('UserTypeOrmRepository (e2e)', () => {
         active: true,
         createdAt: new Date(),
         updatedAt: new Date(),
+        createdBy: null,
+        updatedBy: null,
       });
 
       // Act + Assert
@@ -93,7 +97,7 @@ describe('UserTypeOrmRepository (e2e)', () => {
       // Arrange
       const user = buildUser('renombrado@example.com');
       await repository.save(user);
-      user.rename('Nombre Cambiado', new Date());
+      user.rename('Nombre Cambiado', new Date(), ACTOR_ID);
 
       // Act
       await repository.save(user);
@@ -114,7 +118,7 @@ describe('UserTypeOrmRepository (e2e)', () => {
     it('debería persistir el rol admin en la columna cruda tras promover al usuario', async () => {
       // Arrange
       const user = buildUser('promovido@example.com');
-      user.promoteToAdmin(new Date('2026-07-27T10:00:00.000Z'));
+      user.promoteToAdmin(new Date('2026-07-27T10:00:00.000Z'), ACTOR_ID);
 
       // Act
       await repository.save(user);
@@ -125,6 +129,33 @@ describe('UserTypeOrmRepository (e2e)', () => {
         [user.id.value],
       );
       expect(rows[0]?.role).toBe('admin');
+    });
+
+    /**
+     * Mismo criterio que el caso del rol: contra la COLUMNA CRUDA, no contra `UserOrmEntity` ni
+     * `UserMapper.toDomain`. Aquí importa el doble: es lo único que demuestra que las columnas
+     * existen de verdad en PostgreSQL con el nombre que la entidad espera —`"createdBy"` y
+     * `"updatedBy"`, camelCase entrecomillado, como sus hermanas `"createdAt"`/`"updatedAt"`— y
+     * que `AddAuditActorColumns` se aplicó. Con `getRepository().find()`, un nombre equivocado
+     * habría fallado igual, pero sin decir cuál.
+     *
+     * `createdBy` es NULL a propósito: `buildUser` reproduce el alta pública, que no tiene actor.
+     */
+    it('debería persistir los dos actores en sus columnas crudas', async () => {
+      // Arrange
+      const user = buildUser('auditado@example.com');
+      user.deactivate(new Date('2026-07-27T11:00:00.000Z'), ACTOR_ID);
+
+      // Act
+      await repository.save(user);
+
+      // Assert
+      const rows = await dataSource.query<{ createdBy: string | null; updatedBy: string | null }[]>(
+        'SELECT "createdBy", "updatedBy" FROM users WHERE id = $1',
+        [user.id.value],
+      );
+      expect(rows[0]?.createdBy).toBeNull();
+      expect(rows[0]?.updatedBy).toBe(ACTOR_ID);
     });
   });
 
@@ -174,4 +205,5 @@ const buildUser = (email: string): User =>
     email: Email.from(email),
     name: 'Usuario de Prueba',
     now: new Date('2026-07-27T10:00:00.000Z'),
+    createdBy: null,
   });

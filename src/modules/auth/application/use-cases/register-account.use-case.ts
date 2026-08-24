@@ -80,8 +80,16 @@ export class RegisterAccountUseCase {
     }
 
     try {
+      // `createdBy: null` = el sistema. `POST /auth/register` es `@Public()`: la petición no
+      // trae token, así que no hay `sub` que anotar. Poner aquí `created.user.id` diría que la
+      // cuenta se creó a sí misma, que no es una afirmación que la traza deba hacer.
       await this.credentials.save(
-        Credential.create({ userId: created.user.id, passwordHash, now: new Date() }),
+        Credential.create({
+          userId: created.user.id,
+          passwordHash,
+          now: new Date(),
+          createdBy: null,
+        }),
       );
     } catch (error) {
       // Compensación. El `await` es deliberado: propagar antes de terminar el borrado

@@ -9,6 +9,8 @@ import { emailArb, timestampArb, userNameArb } from '../../helpers/arbitraries';
 
 const CREATED_AT = new Date('2026-07-01T08:00:00.000Z');
 const UPDATED_AT = new Date('2026-07-27T10:00:00.000Z');
+const CREATED_BY = '3f1a9b2c-8d4e-4f6a-9b1c-2e5d7a0f3b48';
+const UPDATED_BY = '5b7c2d4e-9a1f-4c3b-8e6d-0f2a4b6c8d1e';
 
 describe('UserMapper', () => {
   describe('toPersistence()', () => {
@@ -30,7 +32,7 @@ describe('UserMapper', () => {
     it('debería conservar las marcas de tiempo del agregado', () => {
       // Arrange
       const user = buildDomainUser();
-      user.rename('Nombre Nuevo', UPDATED_AT);
+      user.rename('Nombre Nuevo', UPDATED_AT, UPDATED_BY);
 
       // Act
       const row = UserMapper.toPersistence(user);
@@ -38,6 +40,22 @@ describe('UserMapper', () => {
       // Assert
       expect(row.createdAt).toEqual(CREATED_AT);
       expect(row.updatedAt).toEqual(UPDATED_AT);
+    });
+
+    // Nombra los dos campos, que es lo que un round-trip no hace: el property-based de más abajo
+    // solo diría «dos snapshots difieren». Y son DOS valores distintos a propósito — con el
+    // mismo, un `toPersistence` que copiara `createdBy` en las dos columnas pasaría igual.
+    it('debería escribir createdBy y updatedBy en columnas separadas', () => {
+      // Arrange
+      const user = buildDomainUser();
+      user.rename('Nombre Nuevo', UPDATED_AT, UPDATED_BY);
+
+      // Act
+      const row = UserMapper.toPersistence(user);
+
+      // Assert
+      expect(row.createdBy).toBe(CREATED_BY);
+      expect(row.updatedBy).toBe(UPDATED_BY);
     });
   });
 
@@ -101,6 +119,21 @@ describe('UserMapper', () => {
       // Act + Assert
       expect(() => UserMapper.toDomain(row)).toThrow();
     });
+
+    // Las columnas son NULLABLE porque llegan a una tabla viva (`AddAuditActorColumns`), así que
+    // toda fila anterior a la migración las trae a NULL. El mapper las pasa TAL CUAL: `null`
+    // significa «el sistema / no se sabe», y coalescerlo a una cadena inventaría un actor.
+    it('debería reconstruir una fila cuyos actores son null', () => {
+      // Arrange
+      const row = buildRow({ createdBy: null, updatedBy: null });
+
+      // Act
+      const user = UserMapper.toDomain(row);
+
+      // Assert
+      expect(user.createdBy).toBeNull();
+      expect(user.updatedBy).toBeNull();
+    });
   });
 
   describe('toDomain() ∘ toPersistence() (property-based)', () => {
@@ -123,9 +156,10 @@ describe('UserMapper', () => {
               email: Email.from(email),
               name,
               now,
+              createdBy: CREATED_BY,
             });
             if (!active) {
-              original.deactivate(now);
+              original.deactivate(now, UPDATED_BY);
             }
 
             // Act
@@ -158,6 +192,7 @@ const buildDomainUser = (): User =>
     email: Email.from('maria@example.com'),
     name: 'María González',
     now: CREATED_AT,
+    createdBy: CREATED_BY,
   });
 
 const buildRow = (overrides: Partial<UserOrmEntity> = {}): UserOrmEntity => {
@@ -169,5 +204,7 @@ const buildRow = (overrides: Partial<UserOrmEntity> = {}): UserOrmEntity => {
   row.active = true;
   row.createdAt = CREATED_AT;
   row.updatedAt = UPDATED_AT;
+  row.createdBy = CREATED_BY;
+  row.updatedBy = UPDATED_BY;
   return Object.assign(row, overrides);
 };

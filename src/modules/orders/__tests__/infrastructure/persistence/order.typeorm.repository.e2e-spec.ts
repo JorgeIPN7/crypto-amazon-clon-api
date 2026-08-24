@@ -13,6 +13,8 @@ import { OrderOrmEntity } from '../../../infrastructure/persistence/order.orm-en
 import { OrderTypeOrmRepository } from '../../../infrastructure/persistence/order.typeorm.repository';
 
 const CUSTOMER_ID = '9d2a1c7e-1f6b-4a2e-9c3d-77a1b0e5f012';
+/** Actor distinto del cliente: así la fila cruda distingue `created_by` de `customer_id`. */
+const ACTOR_ID = '5b7c2d4e-9a1f-4c3b-8e6d-0f2a4b6c8d1e';
 
 /**
  * Contra PostgreSQL real: lo que se verifica es la TRANSACCIÓN — mockear el ORM aquí
@@ -54,6 +56,14 @@ describe('OrderTypeOrmRepository (e2e)', () => {
         'SELECT id, customer_id FROM orders',
       );
       expect(orderRows).toEqual([{ id: order.id.value, customer_id: CUSTOMER_ID }]);
+
+      // Las columnas de actor, contra el SQL crudo: es lo único que demuestra que existen en
+      // PostgreSQL con el nombre snake_case que `OrderOrmEntity` declara, y que
+      // `AddAuditActorColumns` se aplicó. `created_by ≠ customer_id` a propósito.
+      const auditRows = await dataSource.query<
+        { created_by: string | null; updated_by: string | null }[]
+      >('SELECT created_by, updated_by FROM orders');
+      expect(auditRows).toEqual([{ created_by: ACTOR_ID, updated_by: ACTOR_ID }]);
 
       const outboxRows = await dataSource.query<
         { event_type: string; payload: Record<string, unknown>; processed_at: Date | null }[]
@@ -128,4 +138,5 @@ const placeOrder = (): Order =>
     concept: OrderConcept.from('Suscripción anual plan Pro'),
     amount: OrderAmount.from(149_900),
     now: new Date('2026-08-06T09:30:00.000Z'),
+    createdBy: ACTOR_ID,
   });

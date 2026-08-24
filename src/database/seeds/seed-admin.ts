@@ -28,7 +28,13 @@ const ADMIN_NAME = 'Administrator';
  * OJO con las columnas: los timestamps son camelCase ENTRECOMILLADOS ("createdAt"/
  * "updatedAt") — no hay NamingStrategy y TypeORM usó el nombre de propiedad tal cual;
  * las columnas snake_case (`role`, `user_id`, `password_hash`) lo son por `name:` explícito
- * en su ORM entity.
+ * en su ORM entity. Los actores de auditoría ("createdBy"/"updatedBy") siguen la convención de
+ * los timestamps, que son sus hermanas.
+ *
+ * **El seed NUNCA nombra `"createdBy"` en un INSERT: el sistema es `null`, y `null` es lo que la
+ * columna guarda sola.** No hay centinela `'system'` — el criterio completo está en el JSDoc de
+ * `AuditTrail`. En los dos UPDATE sí se escribe `"updatedBy" = NULL` explícitamente, porque ahí
+ * la columna ya podía traer un actor anterior y hay que retirarlo.
  *
  * Nunca loguea el password ni el hash (security-auth-jwt): el único `console.log` de
  * este módulo, en el bloque CLI de más abajo, imprime el resultado ('created' |
@@ -63,8 +69,13 @@ export async function seedAdmin(dataSource: DataSource): Promise<'created' | 'pr
       //
       // Promover a admin y dejarlo desactivado no es un estado que nadie pida a propósito:
       // «este usuario es el administrador pero no puede operar» no describe ninguna intención.
+      // `"updatedBy" = NULL` es una ESCRITURA, no una omisión: quien acaba de tocar la fila es
+      // el seed, que corre por CLI y no tiene actor humano detrás. Dejar el valor anterior diría
+      // que el último en modificar el perfil fue el administrador que lo desactivó por error, y
+      // esa afirmación se vuelve falsa justo en el momento en que el seed lo rescata.
       await manager.query(
-        `UPDATE users SET role = 'admin', active = true, "updatedAt" = now() WHERE id = $1`,
+        `UPDATE users SET role = 'admin', active = true, "updatedAt" = now(), "updatedBy" = NULL
+          WHERE id = $1`,
         [userId],
       );
       await upsertCredential(manager, userId, passwordHash);
@@ -96,7 +107,7 @@ const upsertCredential = async (
     `INSERT INTO auth_credentials (id, user_id, password_hash, "createdAt", "updatedAt")
      VALUES ($1, $2, $3, now(), now())
      ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash,
-       "updatedAt" = now()`,
+       "updatedAt" = now(), "updatedBy" = NULL`,
     [randomUUID(), userId, passwordHash],
   );
 };

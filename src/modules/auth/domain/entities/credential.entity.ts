@@ -1,5 +1,6 @@
-import { randomUUID } from 'node:crypto';
+import { Entity, type AuditTrail } from '@shared/domain/entity.base';
 
+import { CredentialId } from '../value-objects/credential-id.vo';
 import type { PasswordHash } from '../value-objects/password-hash.vo';
 
 export type CredentialSnapshot = {
@@ -8,6 +9,8 @@ export type CredentialSnapshot = {
   passwordHash: string;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
 };
 
 /**
@@ -15,53 +18,80 @@ export type CredentialSnapshot = {
  * ORM y sin framework — el adaptador de persistencia la traduce desde y hacia la fila de
  * `auth_credentials`.
  *
- * `userId` es un `string` y NO un value object: el identificador del usuario pertenece a
- * `users`, y copiar aquí su `UserId` duplicaría una invariante ajena que este contexto no
- * puede mantener sincronizada. Mismo criterio que `Order.customerId` en `orders`.
+ * `id` es un `CredentialId` desde este ciclo (antes, un `string` crudo): lo exige `Entity`,
+ * que necesita un id comparable. `userId` en cambio SIGUE siendo `string` a propósito: el
+ * identificador del usuario pertenece a `users`, y copiar aquí su `UserId` duplicaría una
+ * invariante ajena que este contexto no puede mantener sincronizada. Mismo criterio que
+ * `Order.customerId` en `orders` — y el mismo, exactamente, que hace que `createdBy` y
+ * `updatedBy` de la traza sean `string | null` y no un VO de identidad.
  *
  * La única invariante real del agregado la lleva `PasswordHash` (forma PHC de argon2id), y
  * por eso vive en el VO y no aquí: lo que hay que impedir es persistir un password en claro,
  * no que la credencial cambie de estado — hoy no tiene transiciones (no hay caso de uso de
- * cambio de contraseña). Cuando lo haya, `changePassword(hash, now)` es su sitio.
+ * cambio de contraseña). Cuando lo haya, `changePassword(hash, now, by)` es su sitio, y ahí es
+ * donde entrará el `touch(now, by)` que `Entity` ya le da hecho.
+ *
+ * Consecuencia directa: este agregado no tiene ningún mutador que propague actor, así que hoy
+ * su `updatedBy` solo puede valer lo que valga `createdBy`. La traza está completa; su mitad
+ * «updated» no se mueve hasta que exista la primera transición.
  */
-export class Credential {
+export class Credential extends Entity<CredentialId> {
   private constructor(
-    readonly id: string,
+    id: CredentialId,
     readonly userId: string,
     readonly passwordHash: PasswordHash,
-    readonly createdAt: Date,
-    readonly updatedAt: Date,
-  ) {}
+    audit: AuditTrail,
+  ) {
+    super(id, audit);
+  }
 
-  /** Alta de la credencial. El id lo genera el propio agregado: no hay VO de identidad. */
-  static create(params: { userId: string; passwordHash: PasswordHash; now: Date }): Credential {
-    return new Credential(randomUUID(), params.userId, params.passwordHash, params.now, params.now);
+  /**
+   * Alta de la credencial. El id lo acuña el propio agregado.
+   *
+   * `updatedBy` nace igual a `createdBy`, misma simetría que en `User.create`: quien la escribió
+   * es el último que la escribió mientras no haya un `touch()`.
+   */
+  static create(params: {
+    userId: string;
+    passwordHash: PasswordHash;
+    now: Date;
+    createdBy: string | null;
+  }): Credential {
+    return new Credential(CredentialId.generate(), params.userId, params.passwordHash, {
+      createdAt: params.now,
+      updatedAt: params.now,
+      createdBy: params.createdBy,
+      updatedBy: params.createdBy,
+    });
   }
 
   /** Reconstituye el agregado desde persistencia sin volver a aplicar reglas de creación. */
   static rehydrate(params: {
-    id: string;
+    id: CredentialId;
     userId: string;
     passwordHash: PasswordHash;
     createdAt: Date;
     updatedAt: Date;
+    createdBy: string | null;
+    updatedBy: string | null;
   }): Credential {
-    return new Credential(
-      params.id,
-      params.userId,
-      params.passwordHash,
-      params.createdAt,
-      params.updatedAt,
-    );
+    return new Credential(params.id, params.userId, params.passwordHash, {
+      createdAt: params.createdAt,
+      updatedAt: params.updatedAt,
+      createdBy: params.createdBy,
+      updatedBy: params.updatedBy,
+    });
   }
 
   toSnapshot(): CredentialSnapshot {
     return {
-      id: this.id,
+      id: this.id.value,
       userId: this.userId,
       passwordHash: this.passwordHash.value,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
+      createdBy: this.createdBy,
+      updatedBy: this.updatedBy,
     };
   }
 }
