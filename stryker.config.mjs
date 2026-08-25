@@ -52,6 +52,18 @@
  * 303 killed, 0 timeout, 17 survived, 0 sin cobertura, 5 error (303/320). El censo CRECE con
  * fuerza: de 277 a 320 mutantes válidos, +43.
  *
+ * **Remedición del 2026-08-25**, al cerrar el ciclo de paridad con `bridge-fital-pti-api`
+ * (`SecretValueObject`, `SYSTEM_ACTORS`, `SoftDeletableEntity` y el sellado de los getters de la
+ * traza): **94.65 %** — 336 killed, 0 timeout, 19 survived, **0 sin cobertura**, 5 error
+ * (336/355). El censo pasa de 320 a 355 mutantes válidos, +35. Reparto: `shared` 97.89 %
+ * (93/95), `modules` 93.46 % (243/260).
+ *
+ * ⚠️ Los **0 sin cobertura** son el dato que más costó y el que conviene no perder. La primera
+ * versión de `User` con borrado lógico traía un `restoreProfile()` que no llamaba nadie, y sus
+ * dos mutantes fueron los ÚNICOS sin cobertura de todo el ciclo. El auditor los delató, y el
+ * método se retiró el mismo día: la capacidad ya estaba probada en `SoftDeletableEntity`. Un
+ * mutante sin cobertura no es «falta un test» — casi siempre es «sobra código».
+ *
  * ⚠️ La cifra se remidió al cerrar el ciclo. Durante él pasó por 94.44 % (306 mutantes) y
  * 95.00 % (318): cada tanda de casos nuevos movía el censo, y citar una medición intermedia como
  * si fuera la final es justo el error que esta cabecera existe para evitar.
