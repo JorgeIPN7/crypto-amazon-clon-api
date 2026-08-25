@@ -37,6 +37,10 @@ const config = {
     'src/database/data-source.ts',
     'src/database/seeds/**',
     'src/database/outbox/**',
+    // Entran el 2026-08-25 con `migrations.e2e-spec.ts`, que las ejercita de verdad (up → down →
+    // up, con filas dentro). Hasta entonces estaban fuera con su motivo escrito —DDL de un solo
+    // uso que corre la CLI— y esa exención era backlog #2, no algo que esta config cubriera.
+    'src/database/migrations/**',
     '!src/**/__tests__/**',
   ],
   coverageDirectory: 'coverage-e2e',
@@ -52,19 +56,28 @@ const config = {
   // cobertura que esta instrumentación no puede medir.
   //
   // Remedido el 2026-08-19 tras ampliar `collectCoverageFrom` con `data-source.ts`, `seeds/` y
-  // `outbox/`: los cuatro umbrales **se quedan como estaban** porque los cuatro pasan con
-  // margen. Medido sobre `pnpm test:e2e:ci` con la suite entera en verde:
+  // `outbox/`: los cuatro umbrales se quedaron como estaban porque los cuatro pasaban con margen:
   //
   //     statements  84.47  (suelo 80)      branches  41.09  (suelo 30)
   //     functions   89.18  (suelo 80)      lines     87.96  (suelo 80)
   //
-  // Los tres grupos nuevos tiran del agregado hacia abajo sin hundirlo, y su reparto dice por
-  // qué: `data-source.ts` 86.66 % stmts pero 33.33 % de funciones —solo la CLI ejecuta el resto—,
-  // `relay-orders-outbox.ts` 64.70 % y `seed-admin.ts` 81.66 %. Son los números más bajos del
-  // informe y siguen por encima del suelo: medir estos archivos no obligó a relajar nada, que
-  // era la duda al ampliar el scope.
+  // **Remedido otra vez el 2026-08-25**, tras meter `src/database/migrations/**` en el scope con
+  // `migrations.e2e-spec.ts`. La cobertura SUBIÓ, que era lo contrario de lo esperado al ampliar:
+  //
+  //     statements  87.14  (suelo 84)      branches  41.57  (suelo 38)
+  //     functions   92.15  (suelo 88)      lines     90.16  (suelo 87)
+  //
+  // Sube porque las migraciones salen a **100 % de statements y de lines** —el spec las recorre
+  // enteras, ida y vuelta— y arrastran hacia arriba un agregado que hasta ahora solo tenía
+  // módulos y repositorios. Los suelos se elevan con ~3 puntos de margen: apretarlos más
+  // convertiría cualquier refactor menor en una CI roja, que es la vía rápida a que alguien los
+  // baje sin mirar.
+  //
+  // Los números más bajos del informe siguen siendo los mismos y siguen por encima:
+  // `relay-orders-outbox.ts` 64.70 %, `data-source.ts` 33.33 % de funciones (solo la CLI ejecuta
+  // el resto) y `seed-admin.ts` 82.25 %.
   coverageThreshold: {
-    global: { branches: 30, functions: 80, lines: 80, statements: 80 },
+    global: { branches: 38, functions: 88, lines: 87, statements: 84 },
   },
 };
 

@@ -60,7 +60,7 @@ suite E2E, nombrando la columna infractora.
 
 ---
 
-## 2. Ninguna migración tiene prueba, y ahora tampoco la que sí la tenía
+## 2. Ninguna migración tiene prueba, y ahora tampoco la que sí la tenía — CERRADA (2026-08-25)
 
 **Qué pasa.** `src/database/migrations/**` está fuera del `collectCoverageFrom` de las dos suites,
 a propósito y con su motivo escrito: son DDL de un solo uso que ejecuta la CLI. La deuda venía
@@ -87,6 +87,23 @@ historial de esta rama.
 
 **Cómo se sabrá que está hecho.** Un `it` recorre `up → down → up` de
 `MoveCredentialsToAuthExpand` con filas dentro, y comprueba que los hashes sobreviven al viaje.
+
+**Cerrada el 2026-08-25** con `src/database/__tests__/migrations.e2e-spec.ts`: 5 casos sobre una
+base desechable —`migrations_probe_<pid>`, creada en el `beforeAll` y destruida en el `afterAll`,
+tal y como pedía el criterio— que cubren el set completo aplicándose, revirtiéndose entero,
+reconstruyendo el mismo esquema **columna a columna y con su tipo**, y el viaje de ida y vuelta de
+la pareja de credenciales con filas dentro. `src/database/migrations/**` entra en el
+`collectCoverageFrom` del E2E y sale a **100 % de statements y lines**; los cuatro umbrales se
+elevaron en consecuencia (84/38/88/87).
+
+⚠️ **Un hallazgo que merece quedar aquí, medido rompiendo un `down()` a propósito.** Se quitó el
+`DROP COLUMN` del `down()` de `AddSoftDeleteToUsers` y cayó **uno solo** de los cinco casos: el
+del viaje parcial. Los otros cuatro revierten TODO, y al hacerlo el `DROP TABLE users` del
+`down()` de `CreateUsersTable` se lleva por delante la columna huérfana — el defecto se borra a sí
+mismo antes de que nadie lo mire. Es decir: **una reversión total no puede detectar un `down()`
+incompleto**; solo lo ve una reversión parcial, que además es la única que ocurre de verdad —nadie
+revierte siete migraciones, se revierte la última—. Una suite de migraciones que solo haga
+`revertAll` da una sensación de cobertura que no tiene.
 
 ---
 
