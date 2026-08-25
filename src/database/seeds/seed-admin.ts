@@ -25,15 +25,13 @@ const ADMIN_NAME = 'Administrator';
  * consigue con compensación (`RegisterAccountUseCase`), porque ahí los dos contextos no
  * comparten transacción por diseño.
  *
- * OJO con las columnas: los timestamps son camelCase ENTRECOMILLADOS ("createdAt"/
- * "updatedAt") — no hay NamingStrategy y TypeORM usó el nombre de propiedad tal cual;
- * las columnas snake_case (`role`, `user_id`, `password_hash`) lo son por `name:` explícito
- * en su ORM entity. Los actores de auditoría ("createdBy"/"updatedBy") siguen la convención de
- * los timestamps, que son sus hermanas.
+ * Todas las columnas van en snake_case. No hay `NamingStrategy` configurada, así que cada una lo
+ * consigue por su `name:` explícito en la ORM entity — sin él, TypeORM usaría el nombre de la
+ * propiedad y `createdAt` nacería en camel, que es como estuvo el esquema hasta el 2026-08-24.
  *
- * **El seed NUNCA nombra `"createdBy"` en un INSERT: el sistema es `null`, y `null` es lo que la
+ * **El seed NUNCA nombra `"created_by"` en un INSERT: el sistema es `null`, y `null` es lo que la
  * columna guarda sola.** No hay centinela `'system'` — el criterio completo está en el JSDoc de
- * `AuditTrail`. En los dos UPDATE sí se escribe `"updatedBy" = NULL` explícitamente, porque ahí
+ * `AuditTrail`. En los dos UPDATE sí se escribe `"updated_by" = NULL` explícitamente, porque ahí
  * la columna ya podía traer un actor anterior y hay que retirarlo.
  *
  * Nunca loguea el password ni el hash (security-auth-jwt): el único `console.log` de
@@ -69,12 +67,12 @@ export async function seedAdmin(dataSource: DataSource): Promise<'created' | 'pr
       //
       // Promover a admin y dejarlo desactivado no es un estado que nadie pida a propósito:
       // «este usuario es el administrador pero no puede operar» no describe ninguna intención.
-      // `"updatedBy" = NULL` es una ESCRITURA, no una omisión: quien acaba de tocar la fila es
+      // `"updated_by" = NULL` es una ESCRITURA, no una omisión: quien acaba de tocar la fila es
       // el seed, que corre por CLI y no tiene actor humano detrás. Dejar el valor anterior diría
       // que el último en modificar el perfil fue el administrador que lo desactivó por error, y
       // esa afirmación se vuelve falsa justo en el momento en que el seed lo rescata.
       await manager.query(
-        `UPDATE users SET role = 'admin', active = true, "updatedAt" = now(), "updatedBy" = NULL
+        `UPDATE users SET role = 'admin', active = true, "updated_at" = now(), "updated_by" = NULL
           WHERE id = $1`,
         [userId],
       );
@@ -84,7 +82,7 @@ export async function seedAdmin(dataSource: DataSource): Promise<'created' | 'pr
 
     const userId = randomUUID();
     await manager.query(
-      `INSERT INTO users (id, email, name, role, active, "createdAt", "updatedAt")
+      `INSERT INTO users (id, email, name, role, active, "created_at", "updated_at")
        VALUES ($1, $2, $3, 'admin', true, now(), now())`,
       [userId, email, ADMIN_NAME],
     );
@@ -104,10 +102,10 @@ const upsertCredential = async (
   passwordHash: string,
 ): Promise<void> => {
   await manager.query(
-    `INSERT INTO auth_credentials (id, user_id, password_hash, "createdAt", "updatedAt")
+    `INSERT INTO auth_credentials (id, user_id, password_hash, "created_at", "updated_at")
      VALUES ($1, $2, $3, now(), now())
      ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash,
-       "updatedAt" = now(), "updatedBy" = NULL`,
+       "updated_at" = now(), "updated_by" = NULL`,
     [randomUUID(), userId, passwordHash],
   );
 };

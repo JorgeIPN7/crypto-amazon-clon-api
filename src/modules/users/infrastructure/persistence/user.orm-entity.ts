@@ -17,11 +17,15 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColum
  * `CLAUDE.md` («Destructive migrations») solo aplica a lo que TIRA o RENOMBRA. Un `ADD COLUMN`
  * nullable no rompe a ninguna réplica antigua, ni siquiera con `DB_MIGRATIONS_RUN=true`.
  *
- * **Se llaman `"createdBy"`/`"updatedBy"` (camelCase entrecomillado) y no `created_by`** porque
- * en ESTA tabla las columnas hermanas son `"createdAt"`/`"updatedAt"`: no hay NamingStrategy y
- * TypeORM usa el nombre de propiedad tal cual. Poner `created_by` junto a `"createdAt"` metería
- * dos convenciones en la misma fila. `orders` hace lo contrario por el mismo motivo: allí las
- * hermanas son `created_at`/`updated_at`.
+ * **Las cuatro columnas de traza llevan `name` explícito en snake_case.** No hay
+ * `NamingStrategy` configurada, así que sin ese `name` TypeORM usaría el nombre de la propiedad
+ * tal cual y la columna nacería `createdAt` — que es como estuvo hasta el 2026-08-24, cuando el
+ * esquema mezclaba las dos convenciones y `auth_credentials` llegaba a mezclarlas dentro de la
+ * misma tabla (`user_id` y `password_hash` en snake junto a `"createdAt"` en camel).
+ *
+ * Se unificó todo a snake_case reescribiendo las migraciones, algo que solo era barato porque no
+ * había datos ni despliegue — el mismo argumento con el que se colapsó el expand/contract de
+ * `orders`. ⚠️ Con datos, cada columna habría necesitado su propia pareja expand/contract.
  *
  * `varchar` sin `length` y no `uuid`: el actor es un `string | null` en el dominio (ver
  * `AuditTrail`), y una columna `uuid` obligaría a que toda cuenta de servicio futura tuviera
@@ -45,15 +49,15 @@ export class UserOrmEntity {
   @Column({ type: 'boolean', default: true })
   active!: boolean;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ name: 'created_by', type: 'varchar', nullable: true })
   createdBy!: string | null;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ name: 'updated_by', type: 'varchar', nullable: true })
   updatedBy!: string | null;
 }

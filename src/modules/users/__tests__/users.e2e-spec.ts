@@ -279,13 +279,12 @@ describe('Users (e2e)', () => {
         .expect(200);
 
       // Assert
-      const rows = await dataSource.query<{ createdBy: string | null; updatedBy: string | null }[]>(
-        'SELECT "createdBy", "updatedBy" FROM users WHERE id = $1',
-        [id],
-      );
-      expect(rows[0]?.updatedBy).toBe(subOf(adminToken));
+      const rows = await dataSource.query<
+        { created_by: string | null; updated_by: string | null }[]
+      >('SELECT "created_by", "updated_by" FROM users WHERE id = $1', [id]);
+      expect(rows[0]?.updated_by).toBe(subOf(adminToken));
       // El alta es `@Public()`: nadie firmó la creación, y eso NO se sobrescribe al desactivar.
-      expect(rows[0]?.createdBy).toBeNull();
+      expect(rows[0]?.created_by).toBeNull();
     });
 
     it('debería responder 404 al desactivar un usuario inexistente', async () => {

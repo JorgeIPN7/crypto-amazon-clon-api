@@ -134,10 +134,9 @@ describe('UserTypeOrmRepository (e2e)', () => {
     /**
      * Mismo criterio que el caso del rol: contra la COLUMNA CRUDA, no contra `UserOrmEntity` ni
      * `UserMapper.toDomain`. Aquí importa el doble: es lo único que demuestra que las columnas
-     * existen de verdad en PostgreSQL con el nombre que la entidad espera —`"createdBy"` y
-     * `"updatedBy"`, camelCase entrecomillado, como sus hermanas `"createdAt"`/`"updatedAt"`— y
-     * que `AddAuditActorColumns` se aplicó. Con `getRepository().find()`, un nombre equivocado
-     * habría fallado igual, pero sin decir cuál.
+     * existen de verdad en PostgreSQL con el nombre que la entidad espera —`created_by` y
+     * `updated_by`, snake_case como todo el esquema— y que `AddAuditActorColumns` se aplicó. Con
+     * `getRepository().find()`, un nombre equivocado habría fallado igual, pero sin decir cuál.
      *
      * `createdBy` es NULL a propósito: `buildUser` reproduce el alta pública, que no tiene actor.
      */
@@ -150,12 +149,11 @@ describe('UserTypeOrmRepository (e2e)', () => {
       await repository.save(user);
 
       // Assert
-      const rows = await dataSource.query<{ createdBy: string | null; updatedBy: string | null }[]>(
-        'SELECT "createdBy", "updatedBy" FROM users WHERE id = $1',
-        [user.id.value],
-      );
-      expect(rows[0]?.createdBy).toBeNull();
-      expect(rows[0]?.updatedBy).toBe(ACTOR_ID);
+      const rows = await dataSource.query<
+        { created_by: string | null; updated_by: string | null }[]
+      >('SELECT "created_by", "updated_by" FROM users WHERE id = $1', [user.id.value]);
+      expect(rows[0]?.created_by).toBeNull();
+      expect(rows[0]?.updated_by).toBe(ACTOR_ID);
     });
   });
 

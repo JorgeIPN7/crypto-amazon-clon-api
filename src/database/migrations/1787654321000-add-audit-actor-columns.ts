@@ -28,15 +28,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * `src/shared/domain/entity.base.ts`), que es también lo que escriben el seed del admin y el alta
  * pública.
  *
- * **Dos convenciones de nombre, y no es un descuido.** `users` y `auth_credentials` reciben
- * `"createdBy"`/`"updatedBy"` entrecomilladas en camelCase, `orders` recibe
- * `created_by`/`updated_by`. Cada par copia el de SUS columnas hermanas de traza, que ya divergen
- * en el esquema vigente: `users` y `auth_credentials` llevan `"createdAt"`/`"updatedAt"` porque
- * no hay NamingStrategy y TypeORM usó el nombre de propiedad tal cual, mientras que `orders`
- * lleva `created_at`/`updated_at` por `name:` explícito en su ORM entity. Unificar aquí habría
- * dejado `created_by` al lado de `"createdAt"` dentro de la misma fila. Comprobado con
- * `pnpm migration:generate` tras aplicarla: TypeORM no encuentra diferencias entre las entidades
- * y el esquema, que es la prueba de que los seis nombres son los que el ORM espera.
+ * **Las seis columnas van en snake_case, en las tres tablas.** No siempre fue así: hasta el
+ * 2026-08-24 esta migración las creaba siguiendo la convención de cada tabla —camel en `users` y
+ * `auth_credentials`, snake en `orders`— porque el esquema mezclaba ambas y unificar aquí habría
+ * dejado `created_by` al lado de `"createdAt"` en la misma fila. Se unificó el esquema entero
+ * reescribiendo las migraciones, algo barato solo mientras no hubiera datos ni despliegue.
+ *
+ * Comprobado con `pnpm migration:generate` tras aplicarla: TypeORM no encuentra diferencias entre
+ * las entidades y el esquema, que es la prueba de que los seis nombres son los que el ORM espera.
  *
  * `character varying` sin longitud y no `uuid`: el actor es `string | null` en el dominio, y una
  * columna `uuid` obligaría a que cualquier cuenta de servicio futura tuviera forma de UUID. La
@@ -47,10 +46,10 @@ export class AddAuditActorColumns1787654321000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "users" ADD "createdBy" character varying, ADD "updatedBy" character varying`,
+      `ALTER TABLE "users" ADD "created_by" character varying, ADD "updated_by" character varying`,
     );
     await queryRunner.query(
-      `ALTER TABLE "auth_credentials" ADD "createdBy" character varying, ADD "updatedBy" character varying`,
+      `ALTER TABLE "auth_credentials" ADD "created_by" character varying, ADD "updated_by" character varying`,
     );
     await queryRunner.query(
       `ALTER TABLE "orders" ADD "created_by" character varying, ADD "updated_by" character varying`,
@@ -68,8 +67,10 @@ export class AddAuditActorColumns1787654321000 implements MigrationInterface {
       `ALTER TABLE "orders" DROP COLUMN "updated_by", DROP COLUMN "created_by"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "auth_credentials" DROP COLUMN "updatedBy", DROP COLUMN "createdBy"`,
+      `ALTER TABLE "auth_credentials" DROP COLUMN "updated_by", DROP COLUMN "created_by"`,
     );
-    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "updatedBy", DROP COLUMN "createdBy"`);
+    await queryRunner.query(
+      `ALTER TABLE "users" DROP COLUMN "updated_by", DROP COLUMN "created_by"`,
+    );
   }
 }
