@@ -67,7 +67,7 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho y commiteado.
 - [x] **LOTE 5 — APM / reporte de errores** — DECISIÓN TOMADA, ver abajo
 - [x] **LOTE 6 — Tests de migración** (backlog #17)
 - [x] **LOTE 7 — Elevar branches del E2E**
-- [ ] **LOTE 8 — Contrato HTTP a 10**
+- [x] **LOTE 8 — Contrato HTTP a 10**
 - [ ] **LOTE 9 — Generador de módulos** (`pnpm module:new`)
 - [ ] **LOTE 10 — Plantilla de módulo documentada**
 - [ ] **LOTE 11 — El patrón del «comentario que nombra el fallo evitado»**

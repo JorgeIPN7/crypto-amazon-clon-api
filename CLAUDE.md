@@ -311,7 +311,7 @@ defect as an undeclared one: _the published contract describes something the ser
   the status, which is where every divergence appeared during the migration: the published
   examples claimed `UserNotFoundError` while the server sends `Not Found`.
 
-### Three checks, and none replaces another
+### Four checks, and none replaces another
 
 Verified by measurement — deleting one because "another covers it" leaves a hole:
 
@@ -321,6 +321,18 @@ Verified by measurement — deleting one because "another covers it" leaves a ho
    `AllExceptionsFilter`. This is what would catch the factory being wrong.
 3. **example ↔ schema** (Ajv, in the contract guard) is the only one that would have caught the
    `array of arrays` that made `GET /users` unsatisfiable.
+4. **real response ↔ schema** (`openapi-runtime-contract.e2e-spec.ts`, added 2026-08-25) is the
+   only one that lands an actual HTTP request. The other three reason about the **document**: an
+   example can satisfy the schema perfectly while the server returns something else, because the
+   example is a hand-written literal and the response is built by the DTO, the envelope
+   interceptor and the serializer. Nothing tied them together. Verified by deleting one line of
+   `UserResponseDto.fromDomain` — it goes red with `must have required property 'role'` and the
+   exact `schemaPath`.
+   ⚠️ Its script of scenarios is hand-written (each operation needs its own setup: an admin, a
+   user to deactivate, an email that already exists), so there is a case asserting **the script
+   covers every operation the document publishes**. Without it a new endpoint would slip in with
+   nobody validating its response and the suite would stay green — which is how a guard stops
+   guarding without anyone noticing. Adding an endpoint costs adding its scenario, on purpose.
 
 ### Maintaining the Scalar bundle
 
