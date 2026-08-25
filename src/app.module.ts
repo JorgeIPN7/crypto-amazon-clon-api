@@ -6,6 +6,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule, type ThrottlerModuleOptions } from '@nestjs/throttler';
 import { ClsModule } from 'nestjs-cls';
 
+import { ErrorReporter, NoopErrorReporter } from '@common/observability/error-reporter';
 import { AllExceptionsFilter } from '@common/filters/all-exceptions.filter';
 import { TimeoutInterceptor } from '@common/interceptors/timeout.interceptor';
 import { TransformInterceptor } from '@common/interceptors/transform.interceptor';
@@ -57,6 +58,10 @@ import { UsersModule } from '@modules/users/users.module';
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Adaptador por defecto del puerto de APM: no hace nada. Cambiar esta línea por un
+    // `SentryErrorReporter` es todo lo que hace falta para enchufar un APM real — el seam ya
+    // está cableado en `AllExceptionsFilter`. Ver el JSDoc de `ErrorReporter`.
+    { provide: ErrorReporter, useClass: NoopErrorReporter },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },

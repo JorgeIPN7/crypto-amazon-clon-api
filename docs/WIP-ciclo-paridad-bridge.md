@@ -64,13 +64,24 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho y commiteado.
 - [x] **LOTE 2 — Coherencia de nomenclatura** (las 3 de arriba)
 - [x] **LOTE 3 — `NamingStrategy` snake_case** (backlog; hoy cada columna necesita `name:`)
 - [x] **LOTE 4 — Soft delete** — DECISIÓN TOMADA, ver abajo
-- [ ] **LOTE 5 — APM / reporte de errores** — DECISIÓN TOMADA, ver abajo
+- [x] **LOTE 5 — APM / reporte de errores** — DECISIÓN TOMADA, ver abajo
 - [ ] **LOTE 6 — Tests de migración** (backlog #17)
 - [ ] **LOTE 7 — Elevar branches del E2E**
 - [ ] **LOTE 8 — Contrato HTTP a 10**
 - [ ] **LOTE 9 — Generador de módulos** (`pnpm module:new`)
 - [ ] **LOTE 10 — Plantilla de módulo documentada**
 - [ ] **LOTE 11 — El patrón del «comentario que nombra el fallo evitado»**
+
+## Progreso (commits ya en la rama)
+
+| Lote | Commit    | Qué entró                                                                                       |
+| ---- | --------- | ----------------------------------------------------------------------------------------------- |
+| 1    | `c2d4df5` | `SecretValueObject` (3 superficies, no 1 como bridge) + `SYSTEM_ACTORS`; seed con reloj único   |
+| 2    | `7642bae` | `user-role.ts` fuera de `value-objects/`; filtro a plural; adaptadores a `gateways/`            |
+| 3    | `10e576c` | `SnakeNamingStrategy` + E2E de convenciones; backlog #1 CERRADO; 20 `name:` retirados           |
+| 4    | `f066bd7` | `SoftDeletableEntity` + índice parcial; getters de la traza sellados; `restoreProfile` retirado |
+
+Estado tras el lote 4: **712 unitarios · 145 e2e · mutación 94.65 % (0 sin cobertura)**.
 
 ## Decisiones tomadas (para justificar al usuario al final)
 

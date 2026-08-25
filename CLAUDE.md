@@ -346,6 +346,25 @@ In the console look for `Refused to` (how Chrome prefixes CSP violations); in th
 filter to anything that is **not** localhost. Do not add `'wasm-unsafe-eval'` pre-emptively —
 only if step 4 actually breaks.
 
+## Observability: the APM seam exists, the provider doesn't
+
+`ErrorReporter` (`src/common/observability/error-reporter.ts`) is an outbound port that
+`AllExceptionsFilter` calls for **5xx only** — a 404 is the server working, and sending those
+would drown real incidents in noise. The default adapter, `NoopErrorReporter`, does nothing and
+deliberately doesn't log: the filter already wrote that error with the same `requestId` a line
+earlier, so a logging adapter would duplicate every incident.
+
+Enchufar Sentry is one line in `app.module.ts` plus a five-line adapter — the JSDoc has it. What
+this repo does **not** do is what `bridge-fital-pti-api` does: decorate the filter with
+`@SentryExceptionCaptured()`, which ties the filter to one provider and puts `@sentry/nestjs` in
+the tree of everyone who uses the template. An APM ships data off the process; that is the
+deployer's decision, not the template's.
+
+⚠️ **The reporting call is wrapped in `try/catch` and that is load-bearing**, not defensive
+habit: without it an adapter that throws (APM down, bad key) takes down the `reply()` that comes
+after it, and the client gets no response at all because of the system that only watches. Verified
+by removing the `try/catch` — exactly one case goes red.
+
 ## Database
 
 PostgreSQL through TypeORM. Config lives in `src/config/database.config.ts`, wiring in `src/database/`.

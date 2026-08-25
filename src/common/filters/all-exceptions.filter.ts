@@ -15,6 +15,8 @@ import { ZodError } from 'zod';
 
 import type { AppConfig } from '@config/app.config';
 
+import { ErrorReporter, type ReportedErrorContext } from '../observability/error-reporter';
+
 const SAFE_DETAIL_KEYS = ['errors', 'validation', 'fields', 'code', 'issues'] as const;
 
 export type ErrorPayload = {
@@ -47,6 +49,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     private readonly httpAdapterHost: HttpAdapterHost,
     private readonly logger: PinoLogger,
     configService: ConfigService,
+    private readonly errorReporter: ErrorReporter,
   ) {
     this.logger.setContext(AllExceptionsFilter.name);
     this.hidesErrorDetails = configService.getOrThrow<AppConfig>('app').isProductionLike;
@@ -92,7 +95,41 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
+    if (isServerError) {
+      this.reportIncident(exception, {
+        requestId,
+        path: resolvedPath,
+        statusCode: normalized.statusCode,
+      });
+    }
+
     httpAdapter.reply(response, payload, normalized.statusCode);
+  }
+
+  /**
+   * Manda el incidente al APM, si hay uno enchufado. **Solo 5xx**: un 404 o un 422 son el
+   * servidor funcionando, y mandarlos ahogaría los incidentes reales entre ruido. Se reportan
+   * también los 5xx que SÍ son `HttpException` —un `InternalServerErrorException` lanzado a
+   * propósito, como el de `InvalidPasswordHashError`— porque siguen siendo algo que alguien
+   * tiene que mirar.
+   *
+   * ⚠️ El `try/catch` es lo que separa «observabilidad» de «punto único de fallo»: sin él, un
+   * adaptador que lance —el APM caído, una clave mal puesta— tumbaría el `reply()` que viene
+   * después y el cliente se quedaría sin respuesta por culpa del sistema que solo mira. Lo fija
+   * un caso del spec, con un reporter que lanza a propósito.
+   *
+   * El fallo del reporter se loguea a `warn` y no a `error`: no es un fallo de la petición, que
+   * ya tiene su propia línea justo encima.
+   */
+  private reportIncident(exception: unknown, context: ReportedErrorContext): void {
+    try {
+      this.errorReporter.report(exception, context);
+    } catch (reportingError) {
+      this.logger.warn(
+        { err: reportingError, requestId: context.requestId },
+        'El reporte del incidente al APM falló; la respuesta al cliente no se ve afectada',
+      );
+    }
   }
 
   private normalizeException(exception: unknown): NormalizedException {
