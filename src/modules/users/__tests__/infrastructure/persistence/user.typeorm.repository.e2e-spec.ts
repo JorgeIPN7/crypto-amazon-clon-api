@@ -87,6 +87,7 @@ describe('UserTypeOrmRepository (e2e)', () => {
         updatedAt: new Date(),
         createdBy: null,
         updatedBy: null,
+        deletedAt: null,
       });
 
       // Act + Assert
@@ -193,9 +194,101 @@ describe('UserTypeOrmRepository (e2e)', () => {
       expect(page.total).toBe(3);
     });
   });
+
+  /**
+   * El borrado lógico contra PostgreSQL real. El fake en memoria replica este filtrado, pero
+   * replicarlo no lo demuestra: lo que se comprueba aquí es que el `deletedAt: IsNull()` de las
+   * consultas y el índice único PARCIAL de la migración hacen de verdad lo que prometen.
+   */
+  describe('borrado lógico', () => {
+    it('debería dejar de encontrar por id un usuario marcado como borrado', async () => {
+      // Arrange
+      const user = buildUser('borrado@example.com');
+      await repository.save(user);
+      user.softDelete(new Date(), ACTOR);
+
+      // Act
+      await repository.save(user);
+
+      // Assert
+      expect(await repository.findById(user.id)).toBeNull();
+    });
+
+    it('debería dejar de encontrarlo por email', async () => {
+      // Arrange
+      const user = buildUser('borrado.email@example.com');
+      await repository.save(user);
+      user.softDelete(new Date(), ACTOR);
+      await repository.save(user);
+
+      // Act
+      const found = await repository.findByEmail(Email.from('borrado.email@example.com'));
+
+      // Assert
+      expect(found).toBeNull();
+    });
+
+    it('debería excluirlo del listado y también del total', async () => {
+      // Arrange
+      const alive = buildUser('vivo@example.com');
+      const removed = buildUser('borrado.lista@example.com');
+      await repository.save(alive);
+      await repository.save(removed);
+      removed.softDelete(new Date(), ACTOR);
+      await repository.save(removed);
+
+      // Act
+      const page = await repository.findMany({ skip: 0, take: 10 });
+
+      // Assert
+      // El `total` importa tanto como los `items`: si el filtro se aplicara solo a la página, la
+      // paginación anunciaría una siguiente que no existe. Son dos consultas dentro de
+      // `findAndCount`, así que es un fallo posible y no teórico.
+      expect(page.items).toHaveLength(1);
+      expect(page.total).toBe(1);
+      expect(page.items[0]?.email.value).toBe('vivo@example.com');
+    });
+
+    it('debería conservar la fila en la tabla, con su marca y su actor', async () => {
+      // Arrange
+      const user = buildUser('evidencia@example.com');
+      await repository.save(user);
+      user.softDelete(new Date('2026-08-25T12:00:00.000Z'), ACTOR);
+
+      // Act
+      await repository.save(user);
+
+      // Assert
+      const rows = await dataSource.getRepository(UserOrmEntity).find();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.deletedAt).toEqual(new Date('2026-08-25T12:00:00.000Z'));
+      expect(rows[0]?.updatedBy).toBe(ACTOR);
+    });
+
+    it('debería dejar el email libre para un alta nueva', async () => {
+      // Arrange
+      const first = buildUser('reciclado@example.com');
+      await repository.save(first);
+      first.softDelete(new Date(), ACTOR);
+      await repository.save(first);
+
+      // Act
+      const second = buildUser('reciclado@example.com');
+      await repository.save(second);
+
+      // Assert
+      // Es lo que el índice único PARCIAL hace posible. Con el índice total de antes, esta línea
+      // lanzaría `EmailAlreadyTakenError` y la compensación del alta quedaría inservible.
+      expect(await repository.findByEmail(Email.from('reciclado@example.com'))).not.toBeNull();
+      expect(await dataSource.getRepository(UserOrmEntity).count()).toBe(2);
+    });
+  });
 });
 
 // Helpers
+
+/** Actor de las marcas de borrado. Un UUID cualquiera: aquí no se comprueba QUIÉN, sino que consta. */
+const ACTOR = '5b7c2d4e-9a1f-4c3b-8e6d-0f2a4b6c8d1e';
 
 const buildUser = (email: string): User =>
   User.create({

@@ -1,4 +1,5 @@
-import { Entity, type AuditTrail } from '@shared/domain/entity.base';
+import type { AuditTrail } from '@shared/domain/entity.base';
+import { SoftDeletableEntity } from '@shared/domain/soft-deletable-entity.base';
 
 import type { Email } from '../value-objects/email.vo';
 import { InvalidUserNameError } from '../errors/user.errors';
@@ -18,6 +19,7 @@ export type UserSnapshot = {
   updatedAt: Date;
   createdBy: string | null;
   updatedBy: string | null;
+  deletedAt: Date | null;
 };
 
 /**
@@ -41,7 +43,7 @@ export type UserSnapshot = {
  * propia tabla. El corte no es estético — mientras el hash vivía aquí, cualquier consulta de
  * perfil arrastraba el secreto y cualquier `toSnapshot()` podía filtrarlo.
  */
-export class User extends Entity<UserId> {
+export class User extends SoftDeletableEntity<UserId> {
   /**
    * Recibe la `AuditTrail` entera y no las marcas sueltas. Con cuatro campos, la alternativa
    * eran nueve parámetros posicionales seguidos de `Date, Date, string|null, string|null` — la
@@ -54,8 +56,9 @@ export class User extends Entity<UserId> {
     private _role: UserRole,
     private _active: boolean,
     audit: AuditTrail,
+    deletedAt: Date | null,
   ) {
-    super(id, audit);
+    super(id, audit, deletedAt);
   }
 
   /**
@@ -71,12 +74,20 @@ export class User extends Entity<UserId> {
     createdBy: string | null;
   }): User {
     const name = User.assertName(params.name);
-    return new User(params.id, params.email, name, 'user', true, {
-      createdAt: params.now,
-      updatedAt: params.now,
-      createdBy: params.createdBy,
-      updatedBy: params.createdBy,
-    });
+    return new User(
+      params.id,
+      params.email,
+      name,
+      'user',
+      true,
+      {
+        createdAt: params.now,
+        updatedAt: params.now,
+        createdBy: params.createdBy,
+        updatedBy: params.createdBy,
+      },
+      null,
+    );
   }
 
   /** Reconstituye el agregado desde persistencia sin volver a aplicar reglas de creación. */
@@ -90,13 +101,22 @@ export class User extends Entity<UserId> {
     updatedAt: Date;
     createdBy: string | null;
     updatedBy: string | null;
+    deletedAt: Date | null;
   }): User {
-    return new User(params.id, params.email, params.name, params.role, params.active, {
-      createdAt: params.createdAt,
-      updatedAt: params.updatedAt,
-      createdBy: params.createdBy,
-      updatedBy: params.updatedBy,
-    });
+    return new User(
+      params.id,
+      params.email,
+      params.name,
+      params.role,
+      params.active,
+      {
+        createdAt: params.createdAt,
+        updatedAt: params.updatedAt,
+        createdBy: params.createdBy,
+        updatedBy: params.updatedBy,
+      },
+      params.deletedAt,
+    );
   }
 
   get email(): Email {
@@ -158,6 +178,26 @@ export class User extends Entity<UserId> {
     this.touch(now, by);
   }
 
+  /**
+   * Borrado LÓGICO del perfil, y no confundir con `deactivate()`: un usuario inactivo sigue
+   * existiendo —ocupa su email, se lista, se reactiva—, mientras que uno borrado no existe para
+   * el dominio. El criterio completo está en `SoftDeletableEntity`.
+   *
+   * Su único llamante es `UsersProvisioning.deleteProfile`, la compensación del alta cuya
+   * credencial no pudo escribirse. Hasta el 2026-08-25 esa compensación hacía un DELETE físico
+   * sobre un esquema sin una sola foreign key: disparada por error, el perfil se perdía y nada
+   * avisaba de las filas que apuntaban a él.
+   */
+  softDelete(now: Date, by: string | null): void {
+    this.markDeleted(now, by);
+  }
+
+  // NO hay `restoreProfile()`. Se escribió y se quitó el mismo día: no tenía un solo llamante, y
+  // el auditor de mutación lo delató con sus dos únicos mutantes sin cobertura de todo el ciclo.
+  // La capacidad existe y está probada en `SoftDeletableEntity.restore()`; exponerla aquí es una
+  // línea el día que exista un caso de uso que restaure, y hoy no lo hay. Mismo criterio con el
+  // que `delete()` salió de `UserRepository`: un método público invita a llamarlo.
+
   toSnapshot(): UserSnapshot {
     return {
       id: this.id.value,
@@ -169,6 +209,7 @@ export class User extends Entity<UserId> {
       updatedAt: this.updatedAt,
       createdBy: this.createdBy,
       updatedBy: this.updatedBy,
+      deletedAt: this.deletedAt,
     };
   }
 

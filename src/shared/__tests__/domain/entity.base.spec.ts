@@ -78,6 +78,57 @@ describe('Entity', () => {
     });
   });
 
+  describe('la traza publicada tampoco se puede mover', () => {
+    // El arreglo anterior (commit 9e18b32) copió los `Date` al construir y al tocar, y con eso
+    // cortó el hilo con las instancias del LLAMANTE. Pero el getter seguía publicando la
+    // instancia interna, así que quien la recibía podía moverla igual. Medido ejecutándolo:
+    //
+    //     antes               : 2020-01-01T00:00:00.000Z
+    //     tras user.updatedAt : 2099-01-01T00:00:00.000Z   <<< MUTADO
+    //     tras user.audit.*   : 2150-01-01T00:00:00.000Z   <<< MUTADO
+    //
+    // Es el mismo defecto un paso más allá: se cerró la ENTRADA y quedó abierta la SALIDA. Y el
+    // JSDoc afirmaba que `Object.freeze` la cerraba, que era falso — `freeze` no protege un
+    // `Date`, cuyo valor vive en un slot interno.
+    it('debería no moverse aunque se mute la fecha devuelta por el getter directo', () => {
+      // Arrange
+      const entity = new SampleEntity(SampleId.from(ID), trail());
+
+      // Act
+      entity.updatedAt.setUTCFullYear(2099);
+
+      // Assert
+      expect(entity.updatedAt).toEqual(UPDATED_AT);
+    });
+
+    it('debería no moverse aunque se mute la fecha devuelta por el getter audit', () => {
+      // Arrange
+      const entity = new SampleEntity(SampleId.from(ID), trail());
+
+      // Act
+      entity.audit.updatedAt.setUTCFullYear(2150);
+
+      // Assert
+      // Caso aparte del anterior y no una aserción más: son DOS getters distintos, y copiar en
+      // uno solo dejaría el otro abierto. Así fue exactamente como quedó el arreglo anterior.
+      expect(entity.updatedAt).toEqual(UPDATED_AT);
+    });
+
+    it('debería no dejar mover createdAt, que ningún camino legítimo reescribe', () => {
+      // Arrange
+      const entity = new SampleEntity(SampleId.from(ID), trail());
+
+      // Act
+      entity.createdAt.setUTCFullYear(1999);
+      entity.audit.createdAt.setUTCFullYear(1998);
+
+      // Assert
+      // `createdAt` es peor que `updatedAt`: no hay ningún método que lo reescriba, así que una
+      // fecha de alta movida no se corrige nunca y la fila miente para siempre.
+      expect(entity.createdAt).toEqual(CREATED_AT);
+    });
+  });
+
   describe('equals()', () => {
     it('debería considerar iguales dos instancias de la misma clase con el mismo id', () => {
       // Arrange — trazas distintas a propósito: la identidad NO depende del contenido.
@@ -200,6 +251,10 @@ describe('Entity', () => {
       // Assert — la traza vieja sigue diciendo lo que decía: es la aserción que cae si `touch`
       // escribe `_audit.updatedAt` en sitio en vez de sustituir el objeto entero. Con el actor
       // dentro, la escritura en sitio se vería además en `before.updatedBy`.
+      // ⚠️ Esta línea es TAUTOLÓGICA desde que `audit` devuelve una copia en cada llamada: dos
+      // accesos consecutivos ya dan objetos distintos, tocado o no. Se conserva porque documenta
+      // la intención de `touch` (sustituir, no escribir dentro), pero NO prueba nada: la que sí
+      // cae si `touch` escribiera en sitio es la siguiente.
       expect(entity.audit).not.toBe(before);
       expect(before.updatedAt).toEqual(UPDATED_AT);
       expect(before.updatedBy).toBe(CREATED_BY);

@@ -45,5 +45,10 @@ export abstract class UserRepository {
   abstract findByEmail(email: Email): Promise<User | null>;
   abstract findMany(criteria: FindUsersCriteria): Promise<UserPage>;
   abstract save(user: User): Promise<void>;
-  abstract delete(id: UserId): Promise<void>;
 }
+
+// `delete()` se retiró del puerto el 2026-08-25. Era el único borrado FÍSICO del repo y su único
+// llamante —la compensación del alta— ahora marca el perfil con `User.softDelete()` y lo guarda
+// con `save()`, que es donde debe estar la decisión: en el agregado, no en el adaptador. Un
+// puerto que expone `delete` invita a llamarlo, y sobre un esquema con cero foreign keys eso
+// deja órdenes y credenciales apuntando al vacío sin que el motor diga nada.

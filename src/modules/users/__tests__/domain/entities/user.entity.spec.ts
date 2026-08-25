@@ -362,6 +362,7 @@ describe('User', () => {
         updatedAt: LATER,
         createdBy: CREATOR,
         updatedBy: EDITOR,
+        deletedAt: null,
       };
 
       // Act
@@ -387,6 +388,7 @@ describe('User', () => {
         updatedAt: LATER,
         createdBy: null,
         updatedBy: EDITOR,
+        deletedAt: null,
       });
 
       // Assert

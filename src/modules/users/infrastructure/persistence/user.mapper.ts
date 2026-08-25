@@ -30,6 +30,7 @@ export const UserMapper = {
       updatedAt: row.updatedAt,
       createdBy: row.createdBy,
       updatedBy: row.updatedBy,
+      deletedAt: row.deletedAt,
     });
   },
 
@@ -45,6 +46,7 @@ export const UserMapper = {
     row.updatedAt = snapshot.updatedAt;
     row.createdBy = snapshot.createdBy;
     row.updatedBy = snapshot.updatedBy;
+    row.deletedAt = snapshot.deletedAt;
     return row;
   },
 };

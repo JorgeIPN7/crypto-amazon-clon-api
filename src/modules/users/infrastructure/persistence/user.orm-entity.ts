@@ -49,7 +49,11 @@ export class UserOrmEntity {
   @PrimaryColumn({ type: 'uuid' })
   id!: string;
 
-  @Index('idx_users_email', { unique: true })
+  // Índice único PARCIAL: una fila borrada no ocupa su email. Sin el `where`, el soft delete
+  // rompería la compensación del alta —el reintento daría 409 en vez de 201—, que es justo la
+  // garantía por la que ese borrado existe. El razonamiento largo está en
+  // `1787800000000-add-soft-delete-to-users.ts`.
+  @Index('idx_users_email', { unique: true, where: '"deleted_at" IS NULL' })
   @Column({ type: 'varchar', length: 254 })
   email!: string;
 
@@ -73,4 +77,18 @@ export class UserOrmEntity {
 
   @Column({ type: 'varchar', nullable: true })
   updatedBy!: string | null;
+
+  /**
+   * Marca de borrado LÓGICO, distinta de `active`: un usuario inactivo existe y ocupa su email;
+   * uno borrado no existe para el dominio (ver `SoftDeletableEntity`).
+   *
+   * Es `@Column` y NO `@DeleteDateColumn`, por el mismo motivo que las otras cuatro columnas de
+   * traza: el reloj lo pone el dominio. `@DeleteDateColumn` haría además que `softRemove()` y
+   * `restore()` de TypeORM la escribieran por su cuenta, abriendo un camino de borrado que no
+   * pasa por el agregado — exactamente lo que `markDeleted()` existe para centralizar.
+   *
+   * Nullable y sin `DEFAULT`: la migración que la añade es puramente aditiva.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  deletedAt!: Date | null;
 }

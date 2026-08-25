@@ -25,12 +25,19 @@ import type { UuidId } from './uuid-id.base';
  * NADA de `src/modules/`. Copiar aquí esa invariante la duplicaría sin poder mantenerla
  * sincronizada.
  *
- * **`null` significa EL SISTEMA, no «se me olvidó».** Hay escrituras sin actor humano y son
- * legítimas: el seed del primer admin (`src/database/seeds/seed-admin.ts`, que corre por CLI), el
- * relay del outbox (`src/database/outbox/relay-orders-outbox.ts`) y el alta pública de
- * `POST /auth/register`, donde quien firma la petición todavía no es nadie. No hay centinela
- * `'system'`: una cadena mágica colisionaría el día que exista una cuenta de servicio con id
- * propio, y `NULL` es además lo que la columna guarda sin ayuda de nadie.
+ * **`null` significa «NO SE SABE», y desde el 2026-08-25 solo eso.** ⚠️ Este párrafo decía lo
+ * contrario —«`null` significa EL SISTEMA» y «no hay centinela `'system'`: una cadena mágica
+ * colisionaría el día que exista una cuenta de servicio con id propio»— y la inversión tiene
+ * motivo: con el mismo `null` para «lo escribió un proceso» y para «no consta quién lo escribió»
+ * —que es lo que valen las filas anteriores a `AddAuditActorColumns`—, la pregunta que una traza
+ * existe para responder no tenía respuesta distinguible.
+ *
+ * Los orígenes automáticos se nombran ahora con `SYSTEM_ACTORS` (`shared/domain/system-actor.ts`):
+ * seed del primer admin, relay del outbox y alta pública de `POST /auth/register`. La objeción de
+ * entonces era buena contra un literal suelto, pero no contra un catálogo cerrado cuyo prefijo
+ * `system:` NO puede colisionar con un UUID de usuario — un UUID no lleva `:`, y lo fija un caso
+ * de `system-actor.spec.ts`. `null` sigue siendo legal y sigue siendo lo que la columna guarda
+ * sin ayuda: es la respuesta correcta cuando de verdad no se sabe.
  *
  * La traza va SEPARADA del estado de negocio y en un campo privado (ver `Entity`), no dentro de
  * un objeto `props` común con el resto: un mutador que pudiera escribir la traza a mano se
@@ -44,15 +51,20 @@ import type { UuidId } from './uuid-id.base';
  *      teniendo mando sobre el agregado.
  *   2. **Reemplazar al tocar** (C13) cierra la escritura en sitio, que dejaría cambiar bajo los
  *      pies la traza que otro ya tiene en la mano.
- *   3. **`Object.freeze` + copiar los `Date`** (ver `sealAudit`) cierra la SALIDA. Las dos
- *      mitades se añadieron después de MEDIR que faltaban, en dos rondas:
- *        - El getter `audit` devuelve la referencia interna, así que sin congelar bastaba
+ *   3. **Sellar también la SALIDA**: los getters devuelven copias. Esta garantía se completó en
+ *      TRES rondas, cada una porque se midió que la anterior no bastaba — y merece la pena
+ *      seguirlas, porque las dos primeras se creyeron suficientes al escribirlas:
+ *        - `Object.freeze` sobre la traza: sin él bastaba
  *          `(entity.audit as { updatedAt: Date }).updatedAt = otra` para mover el sello.
- *        - Y **congelar no basta**: `Object.freeze` no protege un `Date`, cuyo valor vive en un
+ *        - **Congelar no basta**: `Object.freeze` no protege un `Date`, cuyo valor vive en un
  *          slot interno y no en una propiedad. Con el objeto ya congelado,
- *          `entity.audit.updatedAt.setUTCFullYear(2099)` seguía moviendo el sello, y quien
- *          construyó la entidad conservaba la misma instancia. Ambos caminos verificados
- *          ejecutándolos; los cierra la copia, no el congelado.
+ *          `entity.audit.updatedAt.setUTCFullYear(2099)` lo movía igual. Se añadió la copia en
+ *          `sealAudit`, que corre al construir y al tocar.
+ *        - **Y copiar al ENTRAR tampoco basta**, que es lo que quedaba abierto: `sealAudit` corta
+ *          el hilo con las instancias del LLAMANTE, pero los getters seguían publicando las
+ *          internas. Medido: `user.updatedAt.setUTCFullYear(2099)` y
+ *          `user.audit.updatedAt.setUTCFullYear(2150)` movían el sello sobre una entidad recién
+ *          construida. Lo cierran las copias de `get audit`, `get createdAt` y `get updatedAt`.
  *
  * ⚠️ Consecuencia para los tests: las marcas que salen de la entidad **no son las instancias que
  * entraron**. Las aserciones sobre fechas comparan valor (`toEqual`), no identidad (`toBe`). El
@@ -153,16 +165,25 @@ export abstract class Entity<TId extends UuidId> {
     });
   }
 
+  /**
+   * Devuelve una traza NUEVA en cada llamada, con sus `Date` recién copiados. No es cortesía:
+   * publicar `this._audit` entregaba las instancias internas, y `Object.freeze` no protege un
+   * `Date` —su valor vive en un slot interno—, así que
+   * `entity.audit.updatedAt.setUTCFullYear(2150)` movía el sello. Medido ejecutándolo.
+   *
+   * ⚠️ Consecuencia: `entity.audit !== entity.audit`. Una aserción `toBe` sobre este objeto es
+   * TAUTOLÓGICA y no prueba nada; hay una así, marcada como tal, en `entity.base.spec.ts`.
+   */
   get audit(): AuditTrail {
-    return this._audit;
+    return Entity.sealAudit(this._audit);
   }
 
   get createdAt(): Date {
-    return this._audit.createdAt;
+    return new Date(this._audit.createdAt);
   }
 
   get updatedAt(): Date {
-    return this._audit.updatedAt;
+    return new Date(this._audit.updatedAt);
   }
 
   get createdBy(): string | null {

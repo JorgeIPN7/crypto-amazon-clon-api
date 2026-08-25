@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { IsNull, QueryFailedError, Repository } from 'typeorm';
 
 import type { Email } from '../../domain/value-objects/email.vo';
 import { EmailAlreadyTakenError } from '../../domain/errors/user.errors';
@@ -39,18 +39,28 @@ export class UserTypeOrmRepository implements UserRepository {
     private readonly repository: Repository<UserOrmEntity>,
   ) {}
 
+  /**
+   * Las tres consultas filtran `deletedAt IS NULL`, y ese filtro es EXPLÍCITO a propósito.
+   * TypeORM lo pondría solo con `@DeleteDateColumn`, pero esa columna trae consigo
+   * `softRemove()`/`restore()`, que escriben la marca sin pasar por el agregado — un segundo
+   * camino de borrado que `User.softDelete()` existe para evitar. Se paga escribirlo tres veces
+   * a cambio de que solo haya una forma de borrar.
+   */
   async findById(id: UserId): Promise<User | null> {
-    const row = await this.repository.findOne({ where: { id: id.value } });
+    const row = await this.repository.findOne({ where: { id: id.value, deletedAt: IsNull() } });
     return row ? UserMapper.toDomain(row) : null;
   }
 
   async findByEmail(email: Email): Promise<User | null> {
-    const row = await this.repository.findOne({ where: { email: email.value } });
+    const row = await this.repository.findOne({
+      where: { email: email.value, deletedAt: IsNull() },
+    });
     return row ? UserMapper.toDomain(row) : null;
   }
 
   async findMany(criteria: FindUsersCriteria): Promise<UserPage> {
     const [rows, total] = await this.repository.findAndCount({
+      where: { deletedAt: IsNull() },
       skip: criteria.skip,
       take: criteria.take,
       order: { createdAt: 'DESC' },
@@ -75,9 +85,5 @@ export class UserTypeOrmRepository implements UserRepository {
       }
       throw error;
     }
-  }
-
-  async delete(id: UserId): Promise<void> {
-    await this.repository.delete({ id: id.value });
   }
 }

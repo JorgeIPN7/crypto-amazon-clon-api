@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import { SYSTEM_ACTORS } from '@shared/domain/system-actor';
+
 import type { User } from '../domain/entities/user.entity';
 import {
   EmailAlreadyTakenError,
@@ -58,10 +60,12 @@ export type CreateProfileResult =
  *
  * **Por qué dos tokens y no una fachada.** Hasta este cambio había una sola `UsersFacade` con
  * los cuatro métodos, y quien la inyectaba los recibía todos. `UsersCustomerDirectory` de
- * `orders` solo llama a `userExists` y recibía de regalo `deleteProfile`, que es un DELETE
- * FÍSICO (`UserRepository.delete()`) sin equivalente en la API pública —`DELETE /users/:id` es
- * desactivación lógica— y sobre un esquema que no tiene una sola FOREIGN KEY: un borrado de
- * más deja las órdenes y la credencial apuntando al vacío sin que el motor diga nada. La
+ * `orders` solo llama a `userExists` y recibía de regalo `deleteProfile`, que era un DELETE
+ * FÍSICO sin equivalente en la API pública —`DELETE /users/:id` es desactivación lógica— sobre
+ * un esquema que no tiene una sola FOREIGN KEY: un borrado de más dejaba las órdenes y la
+ * credencial apuntando al vacío sin que el motor dijera nada. Desde el 2026-08-25 es un borrado
+ * LÓGICO, así que un borrado de más ya es reversible; la segregación sigue valiendo igual,
+ * porque `orders` tampoco tiene por qué poder borrar. La
  * matriz de boundaries no puede verlo porque razona por ruta, no por lo que trae dentro el
  * archivo importado. Segregar por intención es la única capa que sí lo ve, y la ve al
  * COMPILAR: `orders` ya no puede escribir `this.users.deleteProfile(...)` porque el tipo que
@@ -97,7 +101,7 @@ export abstract class UsersLookup {
 export abstract class UsersProvisioning {
   /** Resultado, no excepción: el consumidor no puede importar los errores de users. */
   abstract createProfile(input: { email: string; name: string }): Promise<CreateProfileResult>;
-  /** Compensación del registro: borra el perfil si la credencial no pudo escribirse. */
+  /** Compensación del registro: MARCA el perfil como borrado si la credencial no pudo escribirse. */
   abstract deleteProfile(id: string): Promise<void>;
 }
 
@@ -165,12 +169,34 @@ export class UsersFacadeImpl implements UsersLookup, UsersProvisioning {
     return user ? toSummary(user) : null;
   }
 
+  /**
+   * Borrado LÓGICO desde el 2026-08-25, no físico. La fila se marca con `deleted_at` y deja de
+   * existir para el dominio: no se encuentra, no se lista y —por el índice único PARCIAL— no
+   * ocupa su email, que es la garantía por la que esta compensación existe.
+   *
+   * Lo que se gana respecto al `DELETE` de antes: la fila queda como EVIDENCIA de un alta que
+   * falló. Antes no quedaba rastro de que alguien lo hubiera intentado, así que una compensación
+   * disparada por error —backlog #16 describe un camino donde dos borrados pueden enmascarar el
+   * error original— era indistinguible de un alta que nunca ocurrió, y el perfil irrecuperable
+   * sobre un esquema con cero foreign keys.
+   *
+   * El actor es `PUBLIC_REGISTRATION`, el mismo con el que nació el perfil: el borrado es parte
+   * del mismo alta pública, y no hay ninguna persona detrás a la que atribuírselo.
+   *
+   * Un id que ni siquiera tiene forma de `UserId` sale por `return` sin tocar nada, igual que
+   * antes; uno bien formado que no existe también, porque `findById` devuelve `null`.
+   */
   async deleteProfile(id: string): Promise<void> {
     const userId = this.parseUserId(id);
     if (!userId) {
       return;
     }
-    await this.users.delete(userId);
+    const user = await this.users.findById(userId);
+    if (!user) {
+      return;
+    }
+    user.softDelete(new Date(), SYSTEM_ACTORS.PUBLIC_REGISTRATION);
+    await this.users.save(user);
   }
 
   /** `null` cuando el id no tiene forma de `UserId`; el resto de errores suben. */

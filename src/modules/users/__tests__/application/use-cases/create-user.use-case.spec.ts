@@ -121,11 +121,13 @@ describe('CreateUserUseCase', () => {
       // Assert
       expect(user).not.toHaveProperty('passwordHash');
       // La lista es EXACTA a propósito: un campo nuevo del agregado no entra al snapshot sin
-      // que este caso se ponga rojo. `createdBy`/`updatedBy` entraron así, decididos.
+      // que este caso se ponga rojo. Ya ha cazado dos entradas decididas: `createdBy`/`updatedBy`
+      // con la traza de auditoría, y `deletedAt` al adoptar `SoftDeletableEntity`.
       expect(Object.keys(user.toSnapshot()).sort()).toEqual([
         'active',
         'createdAt',
         'createdBy',
+        'deletedAt',
         'email',
         'id',
         'name',

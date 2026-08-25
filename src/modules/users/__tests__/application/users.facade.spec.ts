@@ -1,3 +1,5 @@
+import { SYSTEM_ACTORS } from '@shared/domain/system-actor';
+
 import { UsersFacadeImpl } from '../../application/users.facade';
 import { CreateUserUseCase } from '../../application/use-cases/create-user.use-case';
 import type { User } from '../../domain/entities/user.entity';
@@ -223,7 +225,7 @@ describe('UsersFacadeImpl', () => {
   });
 
   describe('deleteProfile()', () => {
-    it('debería borrar el perfil existente', async () => {
+    it('debería dejar el perfil fuera del alcance del dominio', async () => {
       // Arrange
       const user = buildUser();
       const { facade, repository } = build([user]);
@@ -233,6 +235,36 @@ describe('UsersFacadeImpl', () => {
 
       // Assert
       expect(repository.size()).toBe(0);
+      expect(await repository.findById(user.id)).toBeNull();
+    });
+
+    it('debería marcar la fila en vez de hacerla desaparecer', async () => {
+      // Arrange
+      const user = buildUser();
+      const { facade, repository } = build([user]);
+
+      // Act
+      await facade.deleteProfile(user.id.value);
+
+      // Assert
+      // Es la mitad del contrato que `size()` NO puede ver, y la que distingue este cambio de
+      // lo que había: la fila sigue ahí como evidencia de un alta que falló. Antes del
+      // 2026-08-25 no quedaba rastro de que nadie lo hubiera intentado.
+      expect(repository.rowCount()).toBe(1);
+      expect(user.isDeleted).toBe(true);
+    });
+
+    it('debería atribuir el borrado al mismo origen que creó el perfil', async () => {
+      // Arrange
+      const user = buildUser();
+      const { facade } = build([user]);
+
+      // Act
+      await facade.deleteProfile(user.id.value);
+
+      // Assert
+      // No hay persona detrás: la compensación es parte del alta pública, que es `@Public()`.
+      expect(user.updatedBy).toBe(SYSTEM_ACTORS.PUBLIC_REGISTRATION);
     });
 
     it.each([

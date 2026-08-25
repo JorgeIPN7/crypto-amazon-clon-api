@@ -297,12 +297,36 @@ describe('Auth (e2e)', () => {
 
       // Assert: el alta falla…
       expect(response.status).toBe(500);
-      // …y NADA queda: ni el perfil que sí se había creado ni la credencial que falló.
-      const counts = await dataSource.query<{ users: number; credentials: number }[]>(
-        `SELECT (SELECT COUNT(*)::int FROM users) AS users,
+      // …y no queda ninguna cuenta ALCANZABLE. La credencial se borra físicamente; el perfil se
+      // marca como borrado, que para el dominio es lo mismo: no se encuentra, no se lista y no
+      // ocupa su email (índice único PARCIAL). Este caso contaba `users = 0` hasta el
+      // 2026-08-25, cuando la compensación pasó a borrado lógico.
+      const counts = await dataSource.query<{ alive: number; credentials: number }[]>(
+        `SELECT (SELECT COUNT(*)::int FROM users WHERE deleted_at IS NULL) AS alive,
                 (SELECT COUNT(*)::int FROM auth_credentials) AS credentials`,
       );
-      expect(counts[0]).toEqual({ users: 0, credentials: 0 });
+      expect(counts[0]).toEqual({ alive: 0, credentials: 0 });
+    });
+
+    it('debería dejar la fila marcada como evidencia del alta que falló', async () => {
+      // Act
+      await postRegister({
+        email: 'evidencia@example.com',
+        name: 'Usuario Evidencia',
+        password: DEFAULT_PASSWORD,
+      }).expect(500);
+
+      // Assert
+      // La otra mitad del contrato, y lo que este cambio APORTA: antes no quedaba rastro de que
+      // nadie hubiera intentado registrarse, así que una compensación disparada por error era
+      // indistinguible de un alta que nunca ocurrió. `updated_by` dice qué la borró.
+      const rows = await dataSource.query<{ deleted_at: Date | null; updated_by: string | null }[]>(
+        `SELECT deleted_at, updated_by FROM users WHERE email = $1`,
+        ['evidencia@example.com'],
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.deleted_at).not.toBeNull();
+      expect(rows[0]?.updated_by).toBe('system:public-registration');
     });
 
     // La consecuencia observable de que la compensación funcione: el email vuelve a estar

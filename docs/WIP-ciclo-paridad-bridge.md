@@ -63,7 +63,7 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho y commiteado.
   - `SystemActor`: constantes en vez de `null` suelto para seed / relay / alta pública.
 - [x] **LOTE 2 — Coherencia de nomenclatura** (las 3 de arriba)
 - [x] **LOTE 3 — `NamingStrategy` snake_case** (backlog; hoy cada columna necesita `name:`)
-- [ ] **LOTE 4 — Soft delete** — DECISIÓN TOMADA, ver abajo
+- [x] **LOTE 4 — Soft delete** — DECISIÓN TOMADA, ver abajo
 - [ ] **LOTE 5 — APM / reporte de errores** — DECISIÓN TOMADA, ver abajo
 - [ ] **LOTE 6 — Tests de migración** (backlog #17)
 - [ ] **LOTE 7 — Elevar branches del E2E**
