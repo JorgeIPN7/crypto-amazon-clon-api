@@ -243,7 +243,7 @@ describe('User', () => {
       // `touch(now)`, los 115 tests del módulo seguían en verde, y era el único de los cinco
       // mutadores sin ninguna comprobación de la marca de tiempo.
       expect(user.active).toBe(true);
-      expect(user.updatedAt).toBe(reactivatedAt);
+      expect(user.updatedAt).toEqual(reactivatedAt);
     });
 
     // El actor de la reactivación (EDITOR) es distinto del que creó el usuario (CREATOR) Y del

@@ -27,7 +27,7 @@ export type LanguageViolation = {
  * (`total`, `error`, `final`, `local`, `normal`, `original`, `general`, `actor`): añadirlas
  * pondría roja media base de código. `actor` está en esa lista por medición y no por criterio:
  * se añadió a las raíces del 2026-08-22 y puso rojas **siete** declaraciones legítimas —
- * `ACTOR_ID` en cuatro specs, el `actor` de `users.controller.ts` y el nombre de una clase de
+ * `ACTOR_ID` en cinco specs, el `actor` de `users.controller.ts` y el nombre de una clase de
  * migración— antes de retirarla.
  *
  * ⚠️ **La contrapartida, dicha en voz alta: esta lista NO protege la convención, solo las

@@ -20,9 +20,10 @@ import { Column, Entity, PrimaryColumn } from 'typeorm';
  * `Date` y no necesita fallback.
  *
  * `created_by` / `updated_by` son la excepción y por eso SÍ son nullables: llegan con
- * `AddAuditActorColumns` a una tabla que ya existe. Snake_case, a diferencia de `users` y
- * `auth_credentials`, porque aquí las columnas hermanas son `created_at` / `updated_at` — la
- * convención se hereda de la tabla, no del repo, que no tiene una sola.
+ * `AddAuditActorColumns` a una tabla que ya existe, y una columna nueva NOT NULL sin DEFAULT
+ * habría roto los INSERT del código anterior (ver «Destructive migrations» en `CLAUDE.md`).
+ * Snake_case como el resto del esquema: las tres tablas comparten convención desde que se
+ * unificó el 2026-08-24.
  */
 @Entity({ name: 'orders' })
 export class OrderOrmEntity {

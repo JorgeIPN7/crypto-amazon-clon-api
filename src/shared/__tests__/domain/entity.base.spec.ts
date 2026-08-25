@@ -20,8 +20,8 @@ describe('Entity', () => {
 
       // Assert
       expect(entity.id).toBe(id);
-      expect(entity.createdAt).toBe(CREATED_AT);
-      expect(entity.updatedAt).toBe(UPDATED_AT);
+      expect(entity.createdAt).toEqual(CREATED_AT);
+      expect(entity.updatedAt).toEqual(UPDATED_AT);
     });
 
     it('debería exponer la traza completa a través del getter audit', () => {
@@ -50,17 +50,29 @@ describe('Entity', () => {
     });
 
     it('debería copiar la traza recibida en vez de guardar la referencia', () => {
-      // Arrange — traza MUTABLE a propósito: es la que sigue teniendo en la mano quien
-      // construye la entidad. Sin la copia, ese objeto es mando a distancia sobre el agregado.
-      const audit = trail();
+      // Arrange — traza MUTABLE a propósito: es la que sigue teniendo en la mano quien construye
+      // la entidad. Sin la copia, ese objeto es mando a distancia sobre el agregado.
+      //
+      // Las fechas son PROPIAS de este caso y no las constantes del archivo, precisamente porque
+      // aquí se mutan: `trail()` las reutilizaría por referencia y el ataque contaminaría a los
+      // demás `it`. Se descubrió al escribirlo — la primera versión movía `CREATED_AT` a 2100
+      // para todo el spec.
+      const bornAt = new Date('2026-08-01T10:15:00.000Z');
+      const audit = trail({ createdAt: bornAt, updatedAt: new Date(bornAt) });
       const entity = new SampleEntity(SampleId.from(ID), audit);
 
-      // Act
+      // Act — dos ataques distintos, y el segundo es el que se escapaba durante todo el ciclo:
+      // REASIGNAR el campo lo para cualquier copia del objeto, pero MUTAR el `Date` en sitio
+      // atraviesa el spread, que solo copia referencias. `Object.freeze` tampoco lo detiene: el
+      // valor de un `Date` vive en un slot interno, no en una propiedad. Solo lo cierra copiar
+      // la fecha, y eso es lo que hace `Entity.sealAudit`.
       audit.updatedAt = new Date('2030-01-01T00:00:00.000Z');
       audit.updatedBy = 'otro-actor';
+      bornAt.setUTCFullYear(2100);
 
       // Assert
-      expect(entity.updatedAt).toBe(UPDATED_AT);
+      expect(entity.createdAt.getUTCFullYear()).toBe(2026);
+      expect(entity.updatedAt).toEqual(new Date('2026-08-01T10:15:00.000Z'));
       expect(entity.updatedBy).toBe(CREATED_BY);
       expect(entity.audit).not.toBe(audit);
     });
@@ -150,7 +162,7 @@ describe('Entity', () => {
       entity.mutate(now, null);
 
       // Assert
-      expect(entity.updatedAt).toBe(now);
+      expect(entity.updatedAt).toEqual(now);
     });
 
     // C14. El actor viaja hasta `updatedBy` sin transformarse ni perderse: es lo único que
@@ -174,7 +186,7 @@ describe('Entity', () => {
       entity.mutate(new Date('2026-09-09T09:09:09.000Z'), null);
 
       // Assert
-      expect(entity.createdAt).toBe(CREATED_AT);
+      expect(entity.createdAt).toEqual(CREATED_AT);
     });
 
     it('debería reemplazar la traza en touch en lugar de mutarla', () => {
@@ -189,9 +201,9 @@ describe('Entity', () => {
       // escribe `_audit.updatedAt` en sitio en vez de sustituir el objeto entero. Con el actor
       // dentro, la escritura en sitio se vería además en `before.updatedBy`.
       expect(entity.audit).not.toBe(before);
-      expect(before.updatedAt).toBe(UPDATED_AT);
+      expect(before.updatedAt).toEqual(UPDATED_AT);
       expect(before.updatedBy).toBe(CREATED_BY);
-      expect(entity.createdAt).toBe(CREATED_AT);
+      expect(entity.createdAt).toEqual(CREATED_AT);
 
       // La traza NUEVA también sale congelada, no solo la del constructor. Medido: sin esta
       // línea, quitar el `Object.freeze` de `touch` dejaba los 42 tests en verde — la protección
@@ -216,7 +228,7 @@ describe('Entity', () => {
       entity.mutate(earlierInstant, null);
 
       // Assert
-      expect(entity.updatedAt).toBe(earlierInstant);
+      expect(entity.updatedAt).toEqual(earlierInstant);
     });
   });
 
@@ -237,7 +249,7 @@ describe('Entity', () => {
             entity.mutate(now, null);
 
             // Assert
-            expect(entity.updatedAt).toBe(now);
+            expect(entity.updatedAt).toEqual(now);
           },
         ),
       );

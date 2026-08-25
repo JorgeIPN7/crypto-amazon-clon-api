@@ -79,7 +79,7 @@
  * (cuyo único mutante es `error`) sale con **exit 0**. Stryker no ofrece ninguna opción de
  * «mínimo de mutantes» — buscada en su schema y en sus tipos.
  *
- * Con el scope real esto es inalcanzable (319 mutantes válidos), así que **el riesgo no es la CI:
+ * Con el scope real esto es inalcanzable (306 mutantes válidos), así que **el riesgo no es la CI:
  * es la interpretación**. Ya costó una conclusión equivocada en el ciclo del 2026-08-22 — se
  * midió `orders` con `--mutate` en aislado, dio 85.11 % y se reportó que la CI estaba a 0.11
  * puntos de romperse, cuando el margen real era 9.44. Un scope acotado no dice a qué distancia

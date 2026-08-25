@@ -366,8 +366,15 @@ now()` mete un segundo reloj en el sistema: aquí el instante lo pone el dominio
 
 ⚠️ **De dónde sale el relleno importa tanto como el relleno.** Se copia de una columna que ya
 tiene el dato correcto, nunca de `now()`: rellenar con la hora de la migración escribe un dato
-falso en todas las filas históricas. Cuando `orders` recibió sus marcas, el relleno salió de
-`placed_at`, porque para una orden ya existente el momento de creación **es** el de colocación.
+falso en todas las filas históricas. El ejemplo que dio origen a esta regla —`orders` recibiendo
+sus marcas de tiempo con el relleno saliendo de `placed_at`, porque para una orden ya existente el
+momento de creación **es** el de colocación— **ya no está en el árbol**: se ejecutó, se descubrió
+que su `NOT NULL` no era survivable, se partió en expand/contract y finalmente se colapsó dentro de
+`1786076763455-create-orders-and-outbox.ts` al no haber datos ni despliegue. La regla sobrevive al
+ejemplo; el episodio completo está en la cabecera de esa migración.
+
+El ejemplo trabajado que **sí** sigue en el árbol es el par
+`move-credentials-to-auth-{expand,contract}`, más abajo en esta misma sección.
 
 Si ninguna versión desplegada inserta sin nombrar la columna —una tabla que nace en esa misma
 migración, por ejemplo— el `NOT NULL` va en el `CREATE TABLE` y no hay nada que partir.

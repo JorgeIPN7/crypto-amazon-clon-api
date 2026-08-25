@@ -55,9 +55,9 @@ describe('Order', () => {
       });
 
       // Assert
-      expect(order.placedAt).toBe(now);
-      expect(order.createdAt).toBe(now);
-      expect(order.updatedAt).toBe(now);
+      expect(order.placedAt).toEqual(now);
+      expect(order.createdAt).toEqual(now);
+      expect(order.updatedAt).toEqual(now);
     });
 
     // `createdBy` es el ACTOR y `customerId` el DUEÑO. Hoy el caso de uso pasa el mismo valor a
@@ -137,9 +137,9 @@ describe('Order', () => {
       });
 
       // Assert
-      expect(order.placedAt).toBe(placedAt);
-      expect(order.createdAt).toBe(createdAt);
-      expect(order.updatedAt).toBe(updatedAt);
+      expect(order.placedAt).toEqual(placedAt);
+      expect(order.createdAt).toEqual(createdAt);
+      expect(order.updatedAt).toEqual(updatedAt);
     });
   });
 
@@ -160,9 +160,9 @@ describe('Order', () => {
       const snapshot = order.toSnapshot();
 
       // Assert
-      expect(snapshot.createdAt).toBe(now);
-      expect(snapshot.updatedAt).toBe(now);
-      expect(snapshot.placedAt).toBe(now);
+      expect(snapshot.createdAt).toEqual(now);
+      expect(snapshot.updatedAt).toEqual(now);
+      expect(snapshot.placedAt).toEqual(now);
     });
 
     it('debería exponer createdBy y updatedBy en el snapshot', () => {

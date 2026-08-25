@@ -44,12 +44,20 @@ import type { UuidId } from './uuid-id.base';
  *      teniendo mando sobre el agregado.
  *   2. **Reemplazar al tocar** (C13) cierra la escritura en sitio, que dejaría cambiar bajo los
  *      pies la traza que otro ya tiene en la mano.
- *   3. **`Object.freeze`** cierra la SALIDA, y esta se añadió después de MEDIR que faltaba: el
- *      getter `audit` devuelve la referencia interna, así que sin congelar bastaba
- *      `(entity.audit as { updatedAt: Date }).updatedAt = otra` para mover el sello saltándose
- *      `touch()` por completo. Verificado ejecutándolo — `updatedAt` pasaba a 2099 y `updatedBy`
- *      a un valor arbitrario. Congelar es lo único que lo impide **en ejecución**; devolver una
- *      copia también lo taparía, pero vaciaría C13, que compara referencias.
+ *   3. **`Object.freeze` + copiar los `Date`** (ver `sealAudit`) cierra la SALIDA. Las dos
+ *      mitades se añadieron después de MEDIR que faltaban, en dos rondas:
+ *        - El getter `audit` devuelve la referencia interna, así que sin congelar bastaba
+ *          `(entity.audit as { updatedAt: Date }).updatedAt = otra` para mover el sello.
+ *        - Y **congelar no basta**: `Object.freeze` no protege un `Date`, cuyo valor vive en un
+ *          slot interno y no en una propiedad. Con el objeto ya congelado,
+ *          `entity.audit.updatedAt.setUTCFullYear(2099)` seguía moviendo el sello, y quien
+ *          construyó la entidad conservaba la misma instancia. Ambos caminos verificados
+ *          ejecutándolos; los cierra la copia, no el congelado.
+ *
+ * ⚠️ Consecuencia para los tests: las marcas que salen de la entidad **no son las instancias que
+ * entraron**. Las aserciones sobre fechas comparan valor (`toEqual`), no identidad (`toBe`). El
+ * `toBe` sigue siendo correcto sobre el OBJETO `audit` —es lo que C13 usa para comprobar que
+ * `touch` lo reemplaza en vez de mutarlo—, nunca sobre las fechas de dentro.
  */
 export type AuditTrail = {
   readonly createdAt: Date;
@@ -122,7 +130,27 @@ export abstract class Entity<TId extends UuidId> {
     readonly id: TId,
     audit: AuditTrail,
   ) {
-    this._audit = Object.freeze({ ...audit });
+    this._audit = Entity.sealAudit(audit);
+  }
+
+  /**
+   * Congela la traza **y copia sus `Date`**. Las dos mitades hacen falta y tapan agujeros
+   * distintos:
+   *
+   *   - `Object.freeze` impide añadir, quitar o reasignar campos del objeto.
+   *   - `new Date(...)` corta el hilo con las instancias del llamante. **`Object.freeze` NO
+   *     protege un `Date`**: su valor vive en un slot interno, no en una propiedad, así que
+   *     `setUTCFullYear` lo mueve igual sobre un objeto congelado. Medido — y sin la copia había
+   *     dos caminos abiertos para saltarse `touch()` por completo: el `Date` que conserva quien
+   *     construyó la entidad, y el que el getter `audit` publica.
+   */
+  private static sealAudit(audit: AuditTrail): AuditTrail {
+    return Object.freeze({
+      createdAt: new Date(audit.createdAt),
+      updatedAt: new Date(audit.updatedAt),
+      createdBy: audit.createdBy,
+      updatedBy: audit.updatedBy,
+    });
   }
 
   get audit(): AuditTrail {
@@ -146,7 +174,7 @@ export abstract class Entity<TId extends UuidId> {
   }
 
   protected touch(now: Date, by: string | null): void {
-    this._audit = Object.freeze({ ...this._audit, updatedAt: now, updatedBy: by });
+    this._audit = Entity.sealAudit({ ...this._audit, updatedAt: now, updatedBy: by });
   }
 
   equals(other: Entity<TId> | null | undefined): boolean {

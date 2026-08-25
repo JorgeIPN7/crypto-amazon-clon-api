@@ -13,8 +13,8 @@ describe('AggregateRoot', () => {
 
       // Assert
       expect(aggregate.id).toBe(id);
-      expect(aggregate.createdAt).toBe(createdAt);
-      expect(aggregate.updatedAt).toBe(createdAt);
+      expect(aggregate.createdAt).toEqual(createdAt);
+      expect(aggregate.updatedAt).toEqual(createdAt);
     });
   });
 
