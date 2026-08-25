@@ -753,19 +753,23 @@ Expected: PASS — 5 passed
 
 **Casos acordados** (Tabla C):
 
-| #       | Caso (se vuelve el `it`)                                                       | Entrada / estado inicial                                      | Resultado esperado                   |
-| ------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------ |
-| C1      | debería exponer el id, createdAt y updatedAt recibidos                         | entidad sintética                                             | los tres coinciden                   |
-| C2      | debería considerar iguales dos instancias de la misma clase con el mismo id    | mismo id, contenido distinto                                  | `equals` → `true`                    |
-| C3      | debería considerar distintas dos instancias con ids distintos                  | dos entidades                                                 | `equals` → `false`                   |
-| C4      | debería considerar distintas dos entidades de clases distintas con el mismo id | entidad `A` y entidad `B`, mismo id                           | `equals` → `false`                   |
-| C5      | debería devolver false ante null                                               | `equals(null)`                                                | `false`                              |
-| C6      | debería devolver false ante undefined                                          | `equals(undefined)`                                           | `false`                              |
-| C7      | debería considerar igual a una entidad consigo misma                           | `e.equals(e)`                                                 | `true`                               |
-| C8      | debería fijar updatedAt al instante que recibe touch                           | `touch(fecha)`                                                | `updatedAt === fecha`                |
-| C9      | debería dejar createdAt intacto tras un touch                                  | `touch(otraFecha)`                                            | `createdAt` sin cambiar              |
-| **C10** | debería aceptar un touch con una fecha anterior sin lanzar ni ignorarlo        | `touch(2020-01-01)` sobre una entidad con `updatedAt` en 2026 | no lanza; `updatedAt === 2020-01-01` |
-| P1      | debería reflejar exactamente el now inyectado _(propiedad)_                    | `fc.date()` acotada                                           | `updatedAt === now` en toda fecha    |
+| #       | Caso (se vuelve el `it`)                                                       | Entrada / estado inicial                                      | Resultado esperado                           |
+| ------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------- | -------------------------------------------- |
+| C1      | debería exponer el id, createdAt y updatedAt recibidos                         | entidad sintética                                             | los tres coinciden                           |
+| C2      | debería considerar iguales dos instancias de la misma clase con el mismo id    | mismo id, contenido distinto                                  | `equals` → `true`                            |
+| C3      | debería considerar distintas dos instancias con ids distintos                  | dos entidades                                                 | `equals` → `false`                           |
+| C4      | debería considerar distintas dos entidades de clases distintas con el mismo id | entidad `A` y entidad `B`, mismo id                           | `equals` → `false`                           |
+| C5      | debería devolver false ante null                                               | `equals(null)`                                                | `false`                                      |
+| C6      | debería devolver false ante undefined                                          | `equals(undefined)`                                           | `false`                                      |
+| C7      | debería considerar igual a una entidad consigo misma                           | `e.equals(e)`                                                 | `true`                                       |
+| C8      | debería fijar updatedAt al instante que recibe touch                           | `touch(fecha)`                                                | `updatedAt === fecha`                        |
+| C9      | debería dejar createdAt intacto tras un touch                                  | `touch(otraFecha)`                                            | `createdAt` sin cambiar                      |
+| **C11** | debería exponer la traza completa a través del getter audit                    | entidad con los cuatro campos                                 | `audit` los devuelve todos, y congelado      |
+| **C12** | debería copiar la traza recibida en vez de guardar la referencia               | mutar el objeto tras construir                                | la entidad no cambia                         |
+| **C13** | debería reemplazar la traza en touch en lugar de mutarla                       | `touch(now, by)`                                              | la referencia cambia; la traza vieja intacta |
+| **C14** | debería registrar el actor que recibe touch                                    | `touch(now, 'user-123')`                                      | `updatedBy === 'user-123'`                   |
+| **C10** | debería aceptar un touch con una fecha anterior sin lanzar ni ignorarlo        | `touch(2020-01-01)` sobre una entidad con `updatedAt` en 2026 | no lanza; `updatedAt === 2020-01-01`         |
+| P1      | debería reflejar exactamente el now inyectado _(propiedad)_                    | `fc.date()` acotada                                           | `updatedAt === now` en toda fecha            |
 
 ⚠️ **C10 se añadió por confirmación JIT durante el Lote 3.** El revisor de calidad detectó que el
 JSDoc afirma «`touch` no rechaza un `now` anterior» —que es exactamente la decisión que el
@@ -1050,6 +1054,7 @@ export abstract class Entity<TId extends UuidId> {
   protected touch(now: Date): void {
     this._updatedAt = now;
   }
+  // ⚠️ ESTA FIRMA YA NO ES LA VIGENTE — ver el aviso al final de la tarea.
 
   equals(other: Entity<TId> | null | undefined): boolean {
     if (other === null || other === undefined) {
@@ -1067,6 +1072,55 @@ export abstract class Entity<TId extends UuidId> {
 
 Run: `pnpm test src/shared/__tests__/domain/entity.base.spec.ts`
 Expected: PASS — 10 passed
+
+> ## ⚠️ LA FIRMA DE `Entity` CAMBIÓ DESPUÉS — el bloque de arriba es histórico
+>
+> El código que esta tarea especifica **se ejecutó tal cual y funcionó**, pero el usuario pidió
+> después una traza de auditoría extensible («que todas las entity tengan un log de modificación
+> y de creación, e incluso a futuro usuario que modificó»). Con timestamps posicionales, cada
+> campo nuevo obliga a tocar la firma del constructor de los tres agregados, sus `create`, sus
+> `rehydrate` y cada `super(...)`. La firma vigente es:
+>
+> ```ts
+> export type AuditTrail = {
+>   readonly createdAt: Date;
+>   readonly updatedAt: Date;
+>   readonly createdBy: string | null;
+>   readonly updatedBy: string | null;
+> };
+>
+> export abstract class Entity<TId extends UuidId> {
+>   private _audit: AuditTrail;
+>   protected constructor(
+>     readonly id: TId,
+>     audit: AuditTrail,
+>   ) {
+>     this._audit = Object.freeze({ ...audit });
+>   }
+>   get audit(): AuditTrail;
+>   get createdAt(): Date;
+>   get updatedAt(): Date;
+>   get createdBy(): string | null;
+>   get updatedBy(): string | null;
+>   protected touch(now: Date, by: string | null): void {
+>     this._audit = Object.freeze({ ...this._audit, updatedAt: now, updatedBy: by });
+>   }
+>   equals(other: Entity<TId> | null | undefined): boolean; // sin cambios
+> }
+> ```
+>
+> **Se evaluó el patrón «props»** —todo el estado del agregado en un objeto, que es lo que el
+> usuario propuso inicialmente— y se descartó **midiendo**: permite que un mutador escriba
+> `this.props.updatedAt = X` saltándose `touch()`, y ese agujero no se cierra sin romper el
+> patrón (con `props` privado la subclase no puede escribir sus campos de negocio, que es lo
+> único para lo que existe). La traza va separada del estado y en un campo privado.
+>
+> Tres garantías, cada una tapando un agujero distinto: **copiar** al construir cierra la
+> entrada (C12), **reemplazar** al tocar cierra la escritura en sitio (C13), y **`Object.freeze`**
+> cierra la salida — esta última se añadió tras medir que faltaba, porque el getter devuelve la
+> referencia interna y bastaba un cast para mover el sello con todos los gates en verde.
+>
+> ⚠️ **Alcance NUEVO, posterior al plan aprobado.** No estaba en el spec ni en las 15 tareas.
 
 ---
 
