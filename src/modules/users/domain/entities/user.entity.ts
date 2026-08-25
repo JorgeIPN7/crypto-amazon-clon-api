@@ -3,7 +3,7 @@ import { Entity, type AuditTrail } from '@shared/domain/entity.base';
 import type { Email } from '../value-objects/email.vo';
 import { InvalidUserNameError } from '../errors/user.errors';
 import type { UserId } from '../value-objects/user-id.vo';
-import type { UserRole } from '../value-objects/user-role';
+import type { UserRole } from '../user-role';
 
 const NAME_MIN_LENGTH = 2;
 const NAME_MAX_LENGTH = 120;

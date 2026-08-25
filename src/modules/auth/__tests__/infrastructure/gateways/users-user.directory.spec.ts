@@ -3,8 +3,8 @@ import type {
   UserSummary,
   UsersLookup,
   UsersProvisioning,
-} from '../../../users/users.module';
-import { UsersUserDirectory } from '../../infrastructure/users-user.directory';
+} from '../../../../users/users.module';
+import { UsersUserDirectory } from '../../../infrastructure/gateways/users-user.directory';
 
 const KNOWN_ID = '9d2a1c7e-1f6b-4a2e-9c3d-77a1b0e5f012';
 const CREATED_AT = new Date('2026-08-07T10:00:00.000Z');

@@ -26,7 +26,7 @@ export const REQUEST_ID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
  *
  * `AllExceptionsFilter` calcula `error` como `body.error ?? exception.name`. Cuando una
  * `HttpException` se construye con un string —`new ConflictException('...')`, que es lo que hace
- * `UserDomainExceptionFilter`— Nest rellena `body.error` con el nombre canónico, así que el
+ * `UsersDomainExceptionFilter`— Nest rellena `body.error` con el nombre canónico, así que el
  * nombre de la clase de dominio nunca llega al cliente. Estas dos son las excepciones reales:
  *
  * - **429:** `ThrottlerException` se construye con un string suelto, así que el filtro entra en

@@ -62,15 +62,15 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho y commiteado.
   - `PasswordHash.toString()` → `'***REDACTED***'`, y lo mismo para cualquier VO sensible.
   - `SystemActor`: constantes en vez de `null` suelto para seed / relay / alta pública.
 - [x] **LOTE 2 — Coherencia de nomenclatura** (las 3 de arriba)
-- [x] **LOTE 3 — `NamingStrategy` snake_case** (backlog; hoy cada columna necesita `name:`)
-- [x] **LOTE 4 — Soft delete** — DECISIÓN TOMADA, ver abajo
-- [x] **LOTE 5 — APM / reporte de errores** — DECISIÓN TOMADA, ver abajo
-- [x] **LOTE 6 — Tests de migración** (backlog #17)
-- [x] **LOTE 7 — Elevar branches del E2E**
-- [x] **LOTE 8 — Contrato HTTP a 10**
-- [x] **LOTE 9 — Generador de módulos** (`pnpm module:new`)
-- [x] **LOTE 10 — Plantilla de módulo documentada**
-- [x] **LOTE 11 — El patrón del «comentario que nombra el fallo evitado»**
+- [ ] **LOTE 3 — `NamingStrategy` snake_case** (backlog; hoy cada columna necesita `name:`)
+- [ ] **LOTE 4 — Soft delete** — DECISIÓN TOMADA, ver abajo
+- [ ] **LOTE 5 — APM / reporte de errores** — DECISIÓN TOMADA, ver abajo
+- [ ] **LOTE 6 — Tests de migración** (backlog #17)
+- [ ] **LOTE 7 — Elevar branches del E2E**
+- [ ] **LOTE 8 — Contrato HTTP a 10**
+- [ ] **LOTE 9 — Generador de módulos** (`pnpm module:new`)
+- [ ] **LOTE 10 — Plantilla de módulo documentada**
+- [ ] **LOTE 11 — El patrón del «comentario que nombra el fallo evitado»**
 
 ## Decisiones tomadas (para justificar al usuario al final)
 

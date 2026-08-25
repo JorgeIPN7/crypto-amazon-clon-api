@@ -1,4 +1,4 @@
-import { USER_ROLES } from '../../../domain/value-objects/user-role';
+import { USER_ROLES } from '../../domain/user-role';
 
 describe('USER_ROLES', () => {
   it('debería definir exactamente los roles admin y user', () => {

@@ -9,7 +9,7 @@ import { ErrorResponseDto } from '../dto/error-response.dto';
  * Metadata de roles que el JwtAuthGuard resuelve con getAllAndOverride
  * (handler tiene precedencia sobre clase). Tipada laxa a propósito (D1-a de la
  * spec 2026-08-05-auth): el union real `UserRole` vive en
- * `modules/users/domain/value-objects/user-role.ts` y common no puede importarlo (matriz de
+ * `modules/users/domain/user-role.ts` y common no puede importarlo (matriz de
  * boundaries); el guard revalida contra el claim real en runtime.
  */
 export const AuthRoles = Reflector.createDecorator<readonly string[]>();

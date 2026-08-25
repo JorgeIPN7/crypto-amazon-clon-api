@@ -172,13 +172,28 @@ Every bounded context lives under `src/modules/<context>/` with layers **inside*
 src/modules/<context>/
 ├── domain/           # zero @nestjs/* imports; entities, VOs, events, ports/, errors/
 ├── application/      # @Injectable OK; no ORM or HTTP clients; use-cases/ + the context's facade
-├── infrastructure/   # the only layer touching external libs; http/, persistence/, messaging/
+├── infrastructure/   # the only layer touching external libs; http/, persistence/, gateways/, messaging/
 ├── __tests__/        # mirrors the structure above
 └── <context>.module.ts
 ```
 
 - **Dependency rule:** outer → inner only. `domain/` imports nothing from `@nestjs/*`, ORMs, `axios`, `class-validator` decorators, or `pino`.
 - **Controllers are driver adapters** → they live in `infrastructure/http/`.
+- **Every adapter lives in a subfolder that says what it talks to.** `http/` (transport),
+  `persistence/` (the ORM), `security/` (crypto libraries) and `gateways/` — the one for an
+  adapter that talks to **another bounded context** or to an external system, which is what
+  distinguishes an anti-corruption layer from a repository. `UsersUserDirectory` (auth) and
+  `UsersCustomerDirectory` (orders) hung loose from `infrastructure/` until 2026-08-25 and were
+  the only two that did.
+- **`domain/value-objects/` holds only what extends `ValueObject`.** A domain enum, a constant
+  or an auxiliary type goes loose in `domain/` — `users/domain/user-role.ts` is the only such
+  case today, and it lived in `value-objects/` until 2026-08-25, which made that folder mean
+  "domain things that aren't entities". That means nothing.
+- **A context-wide adapter is named after the CONTEXT, not the entity.** The exception filter is
+  `users-domain-exception.filter.ts` / `UsersDomainExceptionFilter` (plural), same as
+  `users.controller.ts` and `users.module.ts`, because it translates any `UserDomainError` no
+  matter where it came from. The marker error stays singular: it talks about a user, not about
+  the context.
 - **Ports are `abstract class`, never `type` + `Symbol` token.** A class survives compilation, so one single reference is both the contract's type and its injection token — Nest accepts `Abstract<T>` as an `InjectionToken` and SWC emits it into `design:paramtypes`. The module wires `{ provide: UserRepository, useClass: UserTypeOrmRepository }` and **no consumer needs `@Inject`**. No `Port` suffix: `UserRepository` doesn't collide, TypeORM's `Repository` only shows up inside the adapter with its own import. Three consequences, all load-bearing:
   - **A port declares only public `abstract` members** — no fields, no `protected`/`private`, no constructor. Two bans, two different causes, both measured with `tsc 6.0.3 --noEmit --strict`. A **field** (public, `protected` or `private`) or a **parameter property** makes the object-literal fakes stop compiling (`TS2741`; there is a real fake in `orders/__tests__/infrastructure/users-customer.directory.spec.ts`). An **empty `protected constructor()` compiles fine** — it is banned for another reason: adapters `implements` and never `extends`, so the port never enters their prototype chain and that constructor never runs. It is dead code promising an initialisation nobody executes, and the doorway parameter properties come in through.
   - **Adapters `implements`, never `extends`.** `extends` would burn the single inheritance slot and demand an empty `super()` for nothing, and `useClass` works identically either way. `implements` is also the _only_ thing that checks conformity: `ClassProvider.provide` is typed `any`, so the module file verifies nothing.

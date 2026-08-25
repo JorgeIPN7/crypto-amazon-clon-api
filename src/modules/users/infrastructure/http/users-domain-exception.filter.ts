@@ -28,8 +28,13 @@ import {
  * ramas explícitas. La rama de credenciales se fue con el hash al filtro de `auth` (ciclo 4):
  * este contexto ya no puede producir un 401 de negocio.
  */
+// El nombre va en PLURAL —`Users…`, no `User…` como hasta el 2026-08-25— porque este filtro
+// es un adaptador del CONTEXTO, no de la entidad: traduce cualquier `UserDomainError`, venga de
+// donde venga. Es la misma regla que ya seguían `users.controller.ts` y `users.module.ts`, y la
+// que hacía que `orders` tuviera el suyo en plural mientras este iba en singular. El error
+// marcador SÍ es singular (`UserDomainError`): habla de un usuario, no del contexto.
 @Catch(UserDomainError)
-export class UserDomainExceptionFilter extends DomainExceptionFilter<UserDomainError> {
+export class UsersDomainExceptionFilter extends DomainExceptionFilter<UserDomainError> {
   protected readonly mappings: DomainErrorMapping<UserDomainError> = [
     [UserNotFoundError, (error) => new NotFoundException(error.message)],
     [EmailAlreadyTakenError, (error) => new ConflictException(error.message)],

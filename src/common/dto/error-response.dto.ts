@@ -24,7 +24,7 @@ export class ErrorResponseDto {
   /**
    * Medido, no supuesto: `AllExceptionsFilter` toma `body.error ?? exception.name`, y cuando el
    * error viene de una `HttpException` construida con un string —que es lo que hace
-   * `UserDomainExceptionFilter`— Nest ya rellena `body.error` con el nombre canónico del status.
+   * `UsersDomainExceptionFilter`— Nest ya rellena `body.error` con el nombre canónico del status.
    * Así que aquí sale `Conflict`, `Not Found` o `Bad Request`, **nunca** el nombre de la clase de
    * dominio: `UserNotFoundError` no llega jamás al cliente. Poner ese ejemplo, como estaba antes,
    * anunciaba un valor imposible e invitaba a bifurcar por algo que no existe.

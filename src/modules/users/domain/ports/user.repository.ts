@@ -29,7 +29,7 @@ export type FindUsersCriteria = {
  *   - Un CAMPO —público, `protected` o `private`— o una parameter property SÍ rompe el fake
  *     por objeto literal: `TS2741: Property 'x' is missing in type '{ … }' but required in
  *     type 'Port'`. Hay un fake real así en
- *     `orders/__tests__/infrastructure/users-customer.directory.spec.ts`.
+ *     `orders/__tests__/infrastructure/gateways/users-customer.directory.spec.ts`.
  *   - Un `protected constructor()` VACÍO no rompe nada: el objeto literal sigue asignando sin
  *     un solo error. Se prohíbe por otra razón — los adaptadores hacen `implements` y jamás
  *     `extends`, así que el puerto no entra en su cadena de prototipos y ese constructor NO

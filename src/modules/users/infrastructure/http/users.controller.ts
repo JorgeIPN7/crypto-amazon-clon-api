@@ -23,7 +23,7 @@ import { FindUserByIdUseCase } from '../../application/use-cases/find-user-by-id
 import { ListUsersUseCase } from '../../application/use-cases/list-users.use-case';
 
 import { UserResponseDto } from './dto/user-response.dto';
-import { UserDomainExceptionFilter } from './user-domain-exception.filter';
+import { UsersDomainExceptionFilter } from './users-domain-exception.filter';
 
 /** Id de ejemplo. Es un UUID v4 válido: `UserId.from()` rechaza cualquier otra cosa con 400. */
 const USER_ID_EXAMPLE = '9d2a1c7e-1f6b-4a2e-9c3d-77a1b0e5f012';
@@ -51,7 +51,7 @@ const USER_EXAMPLE = {
  */
 @ApiTags('Users')
 @Controller('users')
-@UseFilters(UserDomainExceptionFilter)
+@UseFilters(UsersDomainExceptionFilter)
 export class UsersController {
   constructor(
     private readonly findUserById: FindUserByIdUseCase,
@@ -140,7 +140,7 @@ export class UsersController {
   })
   // El 400 aquí no lo produce `ValidationPipe` —`@Param('id')` llega como `string` y no lleva
   // `ParseUUIDPipe`— sino el value object: `UserId.from()` lanza `InvalidUserIdError` y
-  // `UserDomainExceptionFilter` lo traduce a `BadRequestException`. El código es el mismo y la
+  // `UsersDomainExceptionFilter` lo traduce a `BadRequestException`. El código es el mismo y la
   // forma del cuerpo también; el mensaje no, de ahí este ejemplo propio.
   @ApiBadRequestResponse({
     description: 'El id no es un UUID v4.',

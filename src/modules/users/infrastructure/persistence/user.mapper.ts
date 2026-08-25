@@ -1,7 +1,7 @@
 import { Email } from '../../domain/value-objects/email.vo';
 import { User } from '../../domain/entities/user.entity';
 import { UserId } from '../../domain/value-objects/user-id.vo';
-import type { UserRole } from '../../domain/value-objects/user-role';
+import type { UserRole } from '../../domain/user-role';
 
 import { UserOrmEntity } from './user.orm-entity';
 

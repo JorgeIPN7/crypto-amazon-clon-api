@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { TIMESTAMP } from '@common/dto/error-example.factory';
 
-import { USER_ROLES, type UserRole } from '../../../domain/value-objects/user-role';
+import { USER_ROLES, type UserRole } from '../../../domain/user-role';
 import type { User } from '../../../domain/entities/user.entity';
 
 export class UserResponseDto {
