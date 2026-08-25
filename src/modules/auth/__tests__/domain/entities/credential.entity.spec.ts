@@ -154,6 +154,39 @@ describe('Credential', () => {
       expect(revived.toSnapshot()).toEqual(original.toSnapshot());
     });
   });
+
+  describe(`el hash frente a un log`, () => {
+    // El caso real no es loguear el hash a propósito: es un `logger.info({ credential })` de
+    // depuración. Pino serializa con JSON.stringify, que alcanza `_passwordHash` —los campos
+    // privados de TS son propiedades normales en runtime— y ahí interviene el toJSON() de
+    // SecretValueObject. Sin él, la línea del log llevaría el hash entero.
+    it(`debería no revelar el hash al serializar el agregado completo`, () => {
+      // Arrange
+      const credential = buildCredential();
+
+      // Act
+      const serialized = JSON.stringify({ message: 'alta de credencial', credential });
+
+      // Assert
+      expect(serialized).not.toContain(HASH.value);
+      expect(serialized).toContain('***REDACTED***');
+    });
+
+    // Contrapartida explícita del caso anterior, y NO un descuido: `toSnapshot()` es la
+    // representación de PERSISTENCIA, y el adaptador necesita el hash literal para escribir la
+    // fila. Fijarlo aquí evita que alguien arregle el snapshot redactándolo y deje de
+    // poder guardar credenciales — un fallo que ningún test de dominio vería.
+    it(`debería seguir entregando el hash literal en el snapshot, que es lo que se persiste`, () => {
+      // Arrange
+      const credential = buildCredential();
+
+      // Act
+      const snapshot = credential.toSnapshot();
+
+      // Assert
+      expect(snapshot.passwordHash).toBe(HASH.value);
+    });
+  });
 });
 
 // Helpers

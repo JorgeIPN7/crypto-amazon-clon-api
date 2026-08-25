@@ -185,9 +185,20 @@ module.exports = [
               from: { element: { type: 'config' } },
               allow: { to: { element: { type: 'config' } } },
             },
+            // `shared-domain` entró el 2026-08-25 con `SYSTEM_ACTORS`: el seed del admin escribe
+            // `created_by`, y el catálogo de actores automáticos es vocabulario del DOMINIO, no
+            // del script. La alternativa era duplicar los literales en `database/`, que es la vía
+            // directa a que el seed y los casos de uso escriban actores distintos para el mismo
+            // origen — exactamente lo que un catálogo cerrado existe para impedir.
+            //
+            // Es seguro por lo que el kernel ES: `shared-domain` tiene prohibidos TODOS los
+            // externals (regla 4 y siguientes), así que no puede colar una dependencia aquí. La
+            // flecha `database → shared-domain` no abre ningún camino nuevo hacia fuera.
             {
               from: { element: { type: 'database' } },
-              allow: { to: { element: { types: { anyOf: ['database', 'config'] } } } },
+              allow: {
+                to: { element: { types: { anyOf: ['database', 'config', 'shared-domain'] } } },
+              },
             },
             {
               from: { element: { type: 'shared' } },

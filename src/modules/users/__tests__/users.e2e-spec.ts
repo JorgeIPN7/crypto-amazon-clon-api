@@ -1,3 +1,5 @@
+import { SYSTEM_ACTORS } from '@shared/domain/system-actor';
+
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -283,8 +285,12 @@ describe('Users (e2e)', () => {
         { created_by: string | null; updated_by: string | null }[]
       >('SELECT "created_by", "updated_by" FROM users WHERE id = $1', [id]);
       expect(rows[0]?.updated_by).toBe(subOf(adminToken));
-      // El alta es `@Public()`: nadie firmó la creación, y eso NO se sobrescribe al desactivar.
-      expect(rows[0]?.created_by).toBeNull();
+      // `created_by` conserva el origen del ALTA y no se sobrescribe al desactivar: quien creó la
+      // fila no deja de haberla creado porque otro la modifique después. Es el par que hace útil
+      // tener dos columnas en vez de una — y la única forma de verlo es una fila que ya pasó por
+      // las dos manos, que es exactamente el estado en el que está esta.
+      expect(rows[0]?.created_by).toBe(SYSTEM_ACTORS.PUBLIC_REGISTRATION);
+      expect(rows[0]?.created_by).not.toBe(rows[0]?.updated_by);
     });
 
     it('debería responder 404 al desactivar un usuario inexistente', async () => {

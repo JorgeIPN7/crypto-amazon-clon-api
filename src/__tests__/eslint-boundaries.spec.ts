@@ -282,6 +282,30 @@ describe('eslint.boundaries (gate de fronteras — spec 2026-08-04)', () => {
       expect(messages).toHaveLength(0);
     });
 
+    it('debería aceptar que database/ importe el kernel de dominio', async () => {
+      // Arrange + Act
+      const messages = await lint(
+        'src/database/seeds/f.ts',
+        "import { SYSTEM_ACTORS } from '../../shared/domain/system-actor';",
+      );
+      // Assert
+      // El seed escribe `created_by`, y el catálogo de actores es vocabulario del dominio.
+      // Sin esta flecha habría que duplicar los literales en `database/`.
+      expect(messages).toHaveLength(0);
+    });
+
+    it('debería seguir rechazando que database/ importe un módulo', async () => {
+      // Arrange + Act
+      const messages = await lint(
+        'src/database/seeds/f.ts',
+        "import { User } from '../../modules/users/domain/entities/user.entity';",
+      );
+      // Assert
+      // Contrapartida del caso anterior: abrir `database → shared-domain` NO abrió
+      // `database → module`. Sin este caso, un ensanchamiento de más pasaría inadvertido.
+      expect(ruleIds(messages)).toContain('boundaries/dependencies');
+    });
+
     it('debería rechazar `typeorm` en common/', async () => {
       // Arrange + Act
       const messages = await lint('src/common/f.ts', "import { Entity } from 'typeorm';");
