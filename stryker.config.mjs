@@ -48,10 +48,15 @@
  * class` pura ya no aparecen en el informe — cero mutantes, nada que auditar en ellos.
  *
  * Remedición del 2026-08-22 (base común: `DomainError`, `UuidId`, `Entity` y `AggregateRoot`
- * extendiendo `Entity`): **94.44 %** — 289 killed, 0 timeout, 17 survived, 0 sin cobertura,
- * 5 error (289/306). El censo CRECE con fuerza: de 277 a 306 mutantes válidos, +29.
+ * extendiendo `Entity`, más la traza de auditoría y el arreglo del code-review): **94.69 %** —
+ * 303 killed, 0 timeout, 17 survived, 0 sin cobertura, 5 error (303/320). El censo CRECE con
+ * fuerza: de 277 a 320 mutantes válidos, +43.
  *
- * Reparto medido: `shared` **100 %** (59/59), `modules` 93.12 % (230 killed, 17 survived) — y
+ * ⚠️ La cifra se remidió al cerrar el ciclo. Durante él pasó por 94.44 % (306 mutantes) y
+ * 95.00 % (318): cada tanda de casos nuevos movía el censo, y citar una medición intermedia como
+ * si fuera la final es justo el error que esta cabecera existe para evitar.
+ *
+ * Reparto medido: `shared` **100 %** (67/67), `modules` 93.12 % (230 killed, 17 survived) — y
  * dentro de modules, `orders` 85.11 % (40/47) frente a `users`+`auth` 95.00 % (190/200).
  *
  * **El dato que importa aquí es que `shared` pasa de 23 mutantes a 59.** El kernel dejó de ser
@@ -79,7 +84,7 @@
  * (cuyo único mutante es `error`) sale con **exit 0**. Stryker no ofrece ninguna opción de
  * «mínimo de mutantes» — buscada en su schema y en sus tipos.
  *
- * Con el scope real esto es inalcanzable (306 mutantes válidos), así que **el riesgo no es la CI:
+ * Con el scope real esto es inalcanzable (320 mutantes válidos), así que **el riesgo no es la CI:
  * es la interpretación**. Ya costó una conclusión equivocada en el ciclo del 2026-08-22 — se
  * midió `orders` con `--mutate` en aislado, dio 85.11 % y se reportó que la CI estaba a 0.11
  * puntos de romperse, cuando el margen real era 9.44. Un scope acotado no dice a qué distancia
