@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 /**
  * Modelo de persistencia. Es deliberadamente distinto de `User` del dominio: aquí viven
@@ -17,7 +17,18 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColum
  * `CLAUDE.md` («Destructive migrations») solo aplica a lo que TIRA o RENOMBRA. Un `ADD COLUMN`
  * nullable no rompe a ninguna réplica antigua, ni siquiera con `DB_MIGRATIONS_RUN=true`.
  *
- * **Las cuatro columnas de traza llevan `name` explícito en snake_case.** No hay
+ * **Las cuatro columnas de traza son `@Column`, no `@CreateDateColumn`/`@UpdateDateColumn`.** El
+ * reloj lo pone el dominio con el `now` que le inyecta el caso de uso; dejar que lo pusiera
+ * TypeORM metería un segundo reloj en el sistema, y por eso tampoco llevan `DEFAULT now()`.
+ *
+ * No es simetría con `orders`: es que los decoradores tienen un modo de fallo concreto. Con
+ * `@UpdateDateColumn`, un `repository.update({...})` parcial hace que TypeORM añada por su cuenta
+ * `updated_at = CURRENT_TIMESTAMP` (`UpdateQueryBuilder`), y `updated_by` se quedaría con el actor
+ * anterior — una fila afirmando que quien la escribió por última vez es alguien que no la
+ * escribió. Hoy no hay ningún `.update()` parcial en `src/` y todos los mutadores pasan por
+ * `touch()`, así que era inalcanzable; se unificó antes de que dejara de serlo.
+ *
+ * **Las cuatro llevan `name` explícito en snake_case.** No hay
  * `NamingStrategy` configurada, así que sin ese `name` TypeORM usaría el nombre de la propiedad
  * tal cual y la columna nacería `createdAt` — que es como estuvo hasta el 2026-08-24, cuando el
  * esquema mezclaba las dos convenciones y `auth_credentials` llegaba a mezclarlas dentro de la
@@ -49,10 +60,10 @@ export class UserOrmEntity {
   @Column({ type: 'boolean', default: true })
   active!: boolean;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  @Column({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  @Column({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 
   @Column({ name: 'created_by', type: 'varchar', nullable: true })

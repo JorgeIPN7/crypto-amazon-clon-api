@@ -50,8 +50,8 @@ export class MoveCredentialsToAuthExpand1786210289581 implements MigrationInterf
         "id" uuid NOT NULL,
         "user_id" uuid NOT NULL,
         "password_hash" character varying(255) NOT NULL,
-        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-        "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL,
+        "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL,
         CONSTRAINT "pk_auth_credentials" PRIMARY KEY ("id")
       )
     `);

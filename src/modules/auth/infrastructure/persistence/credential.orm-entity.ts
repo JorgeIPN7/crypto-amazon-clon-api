@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 /**
  * Modelo de persistencia de la credencial. Tabla PROPIA de `auth` (`auth_credentials`): el
@@ -8,7 +8,12 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColum
  * único ya es un índice, y `user_id` es la clave de acceso del login (`findByUserId`).
  * Añadir uno no-único encima solo pagaría escrituras sin acelerar ninguna lectura.
  *
- * Las cuatro columnas de traza llevan `name` explícito en snake_case, como el resto de la tabla.
+ * Las cuatro columnas de traza son `@Column`, nunca `@CreateDateColumn`/`@UpdateDateColumn`, por
+ * el mismo motivo que en `user.orm-entity.ts` —donde vive el razonamiento completo—: el reloj lo
+ * pone el dominio, y `@UpdateDateColumn` movería `updated_at` en un `update()` parcial dejando
+ * `updated_by` desincronizado.
+ *
+ * Llevan `name` explícito en snake_case, como el resto de la tabla.
  * Hasta el 2026-08-24 esta era la peor mezcla del esquema: `user_id` y `password_hash` en snake
  * conviviendo con `"createdAt"` y `"updatedAt"` en camel, dentro de la MISMA tabla. Venía de que
  * las marcas de tiempo se heredaron de `users` al mudar aquí el hash, mientras que las otras dos
@@ -31,10 +36,10 @@ export class CredentialOrmEntity {
   @Column({ name: 'password_hash', type: 'varchar', length: 255 })
   passwordHash!: string;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  @Column({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  @Column({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 
   @Column({ name: 'created_by', type: 'varchar', nullable: true })
