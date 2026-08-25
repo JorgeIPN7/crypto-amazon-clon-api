@@ -69,8 +69,8 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho y commiteado.
 - [x] **LOTE 7 — Elevar branches del E2E**
 - [x] **LOTE 8 — Contrato HTTP a 10**
 - [x] **LOTE 9 — Generador de módulos** (`pnpm module:new`)
-- [ ] **LOTE 10 — Plantilla de módulo documentada**
-- [ ] **LOTE 11 — El patrón del «comentario que nombra el fallo evitado»**
+- [x] **LOTE 10 — Plantilla de módulo documentada**
+- [x] **LOTE 11 — El patrón del «comentario que nombra el fallo evitado»**
 
 ## Progreso (commits ya en la rama)
 

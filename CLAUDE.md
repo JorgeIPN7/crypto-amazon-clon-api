@@ -166,7 +166,11 @@ el auditor, no cómo se escribe un test.
 
 ## Architecture rules
 
-Every bounded context lives under `src/modules/<context>/` with layers **inside** it — never at the root of `src/`. **`src/modules/users/` is the reference implementation**: copy its shape for any new context. There are three: `users` (profiles), `auth` (credentials and tokens) and `orders`, plus the flat `health`.
+Every bounded context lives under `src/modules/<context>/` with layers **inside** it — never at the root of `src/`. **`src/modules/users/` is the reference implementation**, but **not everything in it is
+mandatory** — it has a two-token segregated facade, pagination and driver-error translation
+because it needs them. `docs/module-blueprint.md` is the list of what is required and what is
+optional, plus the order to build it in; `pnpm module:new <context> [entity]` generates every
+required piece already passing typecheck, lint (boundaries included), format and its own tests. There are three: `users` (profiles), `auth` (credentials and tokens) and `orders`, plus the flat `health`.
 
 ```
 src/modules/<context>/
@@ -540,6 +544,21 @@ Related: Zod's `.default()` only fires on `undefined`, so a variable that is pre
   Un comentario equivocado es peor que ninguno: el siguiente que lo lea tomará una decisión
   apoyándose en él. Si no lo mediste, escribe que no lo mediste — es una frase perfectamente
   aceptable y el repo la usa.
+
+- **Un buen comentario nombra el FALLO que el código evita, no lo que el código hace.** Lo que
+  hace ya se lee en el código; lo que no se lee es qué pasaría sin él. Es la diferencia entre un
+  comentario que alguien borra en el próximo refactor y uno que le hace parar.
+
+  El mejor ejemplo que encontramos no es de este repo sino de `bridge-fital-pti-api`
+  (`user-sync.service.ts`), y por eso está citado aquí:
+
+  > `// INTENTIONAL: the JWT role is NEVER synced onto an existing user. Elevated roles are`
+  > `// managed manually in the database only; Auth0 always emits 'user', so syncing here would`
+  > `// silently degrade any elevated role on every login.`
+
+  No dice «no sincronizamos el rol». Dice **qué se rompería si lo hicieras** — y por eso nadie va
+  a «arreglar» esa omisión. Un comentario así vale por un test que no existe. Cuando el fallo SÍ
+  es testeable, se escriben las dos cosas: el caso y la línea que dice qué caza.
 
 - **Code in English, prose in Spanish.** Identifiers, object keys, file and folder names, env variables, config keys, SQL columns, `operationId` and form ids are English; comments, documentation, OpenAPI `summary`/`description`, ESLint rule messages and operator-facing messages are Spanish. `src/__tests__/language-convention.spec.ts` enforces it by asserting on **identifiers, never on strings** — which is why the Spanish `it` titles need no exemption. One written exception: the error messages in `env.schema.ts` and `validate-env.ts` are English because they share a string with Zod's untranslatable defaults.
 - **`type`, never `interface`.** ESLint enforces `@typescript-eslint/consistent-type-definitions: ['error', 'type']`. Skill reference files use `interface` as language-agnostic pseudocode — translate it before writing real code. Ports are the one place that is neither: they're `abstract class`, because they must survive compilation to act as their own DI token (see Architecture rules).
