@@ -2,6 +2,8 @@ import { join } from 'node:path';
 
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
+import { SnakeNamingStrategy } from './snake-naming.strategy';
+
 import type { DatabaseConfig } from '@config/database.config';
 
 /**
@@ -28,6 +30,11 @@ export const buildTypeOrmOptions = (config: DatabaseConfig): TypeOrmModuleOption
   entities: [ENTITIES_GLOB],
   migrations: [MIGRATIONS_GLOB],
   migrationsTableName: 'migrations',
+  // Toda columna nace en snake_case sin que nadie escriba `name:`. Se registra AQUÍ y no en
+  // `data-source.ts` porque este builder es el único punto que comparten la CLI de TypeORM y el
+  // runtime de Nest: ponerlo en uno solo los haría divergir, y el que divergiera generaría
+  // migraciones fantasma contra el esquema del otro.
+  namingStrategy: new SnakeNamingStrategy(),
   // `pg` acepta estas opciones de pool directamente.
   extra: {
     max: config.poolMax,

@@ -11,7 +11,7 @@ está congelada y `stryker.config.mjs` la referencia, así que **este backlog em
 
 ---
 
-## 1. La convención snake_case del esquema depende de que cada `@Column` no se olvide
+## 1. La convención snake_case del esquema depende de que cada `@Column` no se olvide — CERRADA (2026-08-25)
 
 **Qué pasa.** No hay `NamingStrategy` configurada en `src/database/typeorm-options.ts`. TypeORM usa
 el nombre de la propiedad tal cual, así que una columna solo acaba en snake_case si su decorador lo
@@ -25,14 +25,35 @@ mudar allí el hash mientras que las otras dos se escribieron nuevas. Se unific�
 migraciones, algo que **solo fue barato porque no había datos ni despliegue** — con datos, cada
 columna habría necesitado su pareja expand/contract.
 
-**Criterio ya decidido.** No se configura `SnakeNamingStrategy` ahora. `typeorm-naming-strategies`
-no está instalada (verificado), así que entraría una dependencia nueva, y esa estrategia reescribe
-el mapeo de **columnas, tablas, índices y claves foráneas de golpe** — mucha más superficie de la
-que el problema necesita, sobre un esquema que acaba de quedar consistente.
+**Criterio que estaba decidido, y por qué dejó de valer.** La entrada decía: no se configura
+`SnakeNamingStrategy` porque (a) `typeorm-naming-strategies` no está instalada, así que entraría una
+dependencia nueva, y (b) esa estrategia reescribe el mapeo de **columnas, tablas, índices y claves
+foráneas de golpe** — mucha más superficie de la que el problema necesita.
 
-La salida preferida es un test que compare el esquema real contra la convención: leer
-`information_schema.columns` y afirmar que ningún nombre tiene mayúsculas. Es una consulta y detecta
-el olvido en el momento en que aparece, sin tocar el mapeo de nada.
+**Las dos objeciones eran contra ESA librería, no contra la idea**, y las dos se resuelven
+escribiendo la estrategia en casa: `src/database/snake-naming.strategy.ts` son ~40 líneas que
+extienden `DefaultNamingStrategy` (de `typeorm`, ya instalada: **cero dependencias nuevas**) y
+sobreescriben **exactamente dos métodos**, `tableName` y `columnName`. Índices y claves foráneas
+siguen con el comportamiento por defecto, intactos.
+
+**Cerrada el 2026-08-25 haciendo LAS DOS cosas**, no eligiendo una:
+
+- La estrategia, registrada en `buildTypeOrmOptions` —el único punto que comparten la CLI de
+  TypeORM y el runtime de Nest, para que no puedan divergir—. Un `name:` explícito sigue ganando y
+  no se convierte, que es lo que permitió adoptarla sin tocar nada. Verificado antes y después:
+  `migration:generate` responde «No changes in database schema were found», y luego se quitaron
+  los **20** `name:` que habían quedado redundantes y volvió a responder lo mismo.
+- El test que la entrada llamaba «salida preferida»:
+  `src/database/__tests__/schema-conventions.e2e-spec.ts` lee `information_schema.columns` y
+  afirma que ninguna columna ni tabla lleva mayúsculas ni separadores raros. **Verificado que
+  falla**: con un `ALTER TABLE users ADD COLUMN "testCamelCase"` inyectado a mano, dos casos se
+  ponen rojos y nombran la columna.
+
+Hacen falta **las dos y no una**, y esto se midió: el E2E lee el esquema, así que quitar la
+estrategia no lo pone rojo —el esquema ya está en snake y ninguna columna cambia—; el defecto
+aparecería en la siguiente columna que alguien añadiera sin `name:`. Por eso hay además un caso
+unitario en `typeorm-options.spec.ts` que afirma que la `namingStrategy` sigue registrada. Uno caza
+la causa, el otro el efecto.
 
 **Cómo se sabrá que está hecho.** Añadir un `@Column` sin su `name` en snake_case pone roja la
 suite E2E, nombrando la columna infractora.

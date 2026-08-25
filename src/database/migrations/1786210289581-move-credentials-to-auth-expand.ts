@@ -33,10 +33,12 @@ const UNRESTORABLE_IN_MESSAGE = 10;
  * se añade cuando la ventana no puede tener altas; en este repo la ventana es un despliegue y
  * el coste de un alta perdida es que ese usuario reintente.
  *
- * Todas las columnas van en snake_case, y todas por `name:` explícito en `CredentialOrmEntity`:
- * no hay `NamingStrategy` configurada, así que sin ese `name` TypeORM usaría el nombre de la
- * propiedad y la columna nacería `createdAt`. Fue así hasta el 2026-08-24, cuando esta tabla
- * mezclaba `user_id` y `password_hash` en snake con `"createdAt"` y `"updatedAt"` en camel.
+ * Todas las columnas van en snake_case. Cuando esta migración se escribió lo conseguían por el
+ * `name:` explícito de `CredentialOrmEntity`; desde el 2026-08-25 lo pone `SnakeNamingStrategy` y
+ * los `name:` se retiraron. El SQL de aquí no cambia —ya estaba en snake— pero la explicación sí,
+ * porque decía que no había estrategia configurada y ahora la hay. Sin ella, TypeORM usaría el
+ * nombre de la propiedad y la columna nacería `createdAt`. Fue así hasta el 2026-08-24, cuando
+ * esta tabla mezclaba `user_id` y `password_hash` en snake con `"createdAt"` y `"updatedAt"` en camel.
  *
  * Sin cualificar el schema, como todas las migraciones del repo: ambos sentidos heredan el
  * `search_path` de la conexión, que sale de `DB_SCHEMA`.

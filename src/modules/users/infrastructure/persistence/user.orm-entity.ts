@@ -28,11 +28,13 @@ import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
  * escribió. Hoy no hay ningún `.update()` parcial en `src/` y todos los mutadores pasan por
  * `touch()`, así que era inalcanzable; se unificó antes de que dejara de serlo.
  *
- * **Las cuatro llevan `name` explícito en snake_case.** No hay
- * `NamingStrategy` configurada, así que sin ese `name` TypeORM usaría el nombre de la propiedad
- * tal cual y la columna nacería `createdAt` — que es como estuvo hasta el 2026-08-24, cuando el
- * esquema mezclaba las dos convenciones y `auth_credentials` llegaba a mezclarlas dentro de la
- * misma tabla (`user_id` y `password_hash` en snake junto a `"createdAt"` en camel).
+ * **Ninguna lleva ya `name` explícito, y sin embargo todas son snake_case.** Lo pone
+ * `SnakeNamingStrategy`, registrada en `buildTypeOrmOptions` desde el 2026-08-25. Hasta entonces
+ * cada columna dependía de que quien la escribiera se acordara del `name:`, y en cuatro casos no
+ * se acordó: el esquema mezclaba las dos convenciones y `auth_credentials` llegaba a mezclarlas
+ * dentro de la MISMA tabla (`user_id` y `password_hash` en snake junto a `"createdAt"` en camel).
+ * Los 20 `name:` que quedaban se quitaron al registrar la estrategia, comprobando antes y después
+ * que `migration:generate` responde «No changes in database schema were found».
  *
  * Se unificó todo a snake_case reescribiendo las migraciones, algo que solo era barato porque no
  * había datos ni despliegue — el mismo argumento con el que se colapsó el expand/contract de
@@ -60,15 +62,15 @@ export class UserOrmEntity {
   @Column({ type: 'boolean', default: true })
   active!: boolean;
 
-  @Column({ name: 'created_at', type: 'timestamptz' })
+  @Column({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @Column({ name: 'updated_at', type: 'timestamptz' })
+  @Column({ type: 'timestamptz' })
   updatedAt!: Date;
 
-  @Column({ name: 'created_by', type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   createdBy!: string | null;
 
-  @Column({ name: 'updated_by', type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   updatedBy!: string | null;
 }

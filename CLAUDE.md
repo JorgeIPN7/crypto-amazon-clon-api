@@ -337,6 +337,22 @@ PostgreSQL through TypeORM. Config lives in `src/config/database.config.ts`, wir
 - **`synchronize` is resolved in code, not taken from the env.** `DB_SYNCHRONIZE` can only ever turn it _off_; turning it _on_ also requires `NODE_ENV=development`. Outside development it is forced to `false` regardless of the `.env`, because `synchronize` can drop columns and data. See `resolveSynchronize()`.
 - **Schema changes go through migrations.** `pnpm migration:generate src/database/migrations/<Name>` after changing an ORM entity, then `pnpm migration:run`. In production `DB_MIGRATIONS_RUN=true` applies them on boot — read the next section before writing one that **drops or renames** anything.
 - **ORM entities are discovered by glob** (`*.orm-entity.ts` anywhere under `src/modules/`), so a new module registers itself with no central list to edit.
+- **Columns are snake_case automatically — don't write `name:`.** `SnakeNamingStrategy`
+  (`src/database/snake-naming.strategy.ts`, ~40 lines extending TypeORM's own
+  `DefaultNamingStrategy`, **no new dependency**) is registered in `buildTypeOrmOptions`, the one
+  place the TypeORM CLI and the Nest runtime share — registering it in only one would make them
+  diverge, and the one that diverged would generate phantom migrations against the other's schema.
+  It overrides exactly two methods, `tableName` and `columnName`; indexes and foreign keys keep
+  the default behaviour. An explicit `name:` still wins and is **not** converted, which is the
+  escape hatch for a legacy column — and what made adoption free (verified with
+  `migration:generate` before and after removing the 20 redundant `name:` that were left).
+  ⚠️ **`@Entity({ name })` is still mandatory**: without it `UserOrmEntity` becomes
+  `user_orm_entity` — the strategy can't know `OrmEntity` is our own decoration.
+  Two tests guard this and **neither replaces the other**, measured: `schema-conventions.e2e-spec.ts`
+  reads `information_schema` and catches a schema that already has camelCase (verified by injecting
+  `ADD COLUMN "testCamelCase"` — it goes red and names the column), but removing the strategy
+  doesn't turn it red because no existing column changes; the unit case in `typeorm-options.spec.ts`
+  catches that. One guards the cause, the other the effect.
 - **TLS:** `DB_SSL=false` locally, `true` against RDS. `DB_SSL_REJECT_UNAUTHORIZED=false` encrypts but does **not** verify the server's identity — prefer pointing `DB_SSL_CA` at the AWS bundle.
 - **Driver errors are translated in the adapter.** `UserTypeOrmRepository.save()` turns PostgreSQL's `23505` into `EmailAlreadyTakenError`, so a concurrent insert surfaces as 409 and not 500. The handler's pre-check is a nicety, not the defence.
 

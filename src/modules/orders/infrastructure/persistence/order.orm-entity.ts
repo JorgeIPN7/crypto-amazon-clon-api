@@ -30,27 +30,27 @@ export class OrderOrmEntity {
   @PrimaryColumn({ type: 'uuid' })
   id!: string;
 
-  @Column({ name: 'customer_id', type: 'uuid' })
+  @Column({ type: 'uuid' })
   customerId!: string;
 
   @Column({ type: 'varchar', length: 140 })
   concept!: string;
 
-  @Column({ name: 'amount_cents', type: 'int' })
+  @Column({ type: 'int' })
   amountCents!: number;
 
-  @Column({ name: 'placed_at', type: 'timestamptz' })
+  @Column({ type: 'timestamptz' })
   placedAt!: Date;
 
-  @Column({ name: 'created_at', type: 'timestamptz' })
+  @Column({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @Column({ name: 'updated_at', type: 'timestamptz' })
+  @Column({ type: 'timestamptz' })
   updatedAt!: Date;
 
-  @Column({ name: 'created_by', type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   createdBy!: string | null;
 
-  @Column({ name: 'updated_by', type: 'varchar', nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   updatedBy!: string | null;
 }

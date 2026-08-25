@@ -1,5 +1,6 @@
 import { buildDatabaseConfig as buildConfig } from '@test/helpers/config.factory';
 
+import { SnakeNamingStrategy } from '../snake-naming.strategy';
 import { buildTypeOrmOptions, ENTITIES_GLOB, MIGRATIONS_GLOB } from '../typeorm-options';
 
 describe('buildTypeOrmOptions', () => {
@@ -66,6 +67,19 @@ describe('buildTypeOrmOptions', () => {
   // Eso solo reformula el literal de la constante: falla al renombrar y sigue en verde si
   // el glob apunta a una carpeta inexistente. Que resuelven de verdad lo demuestra
   // `users.e2e-spec.ts` al persistir una fila contra Postgres.
+
+  it('debería registrar la estrategia de nombres snake_case', () => {
+    // Act
+    const options = buildTypeOrmOptions(buildConfig());
+
+    // Assert
+    // Es una regresión DISTINTA de la que cubre `schema-conventions.e2e-spec.ts`, y por eso hacen
+    // falta las dos. Aquella lee `information_schema` y caza un esquema que YA tiene camelCase;
+    // quitar esta línea no cambia ninguna columna existente, así que aquella seguiría verde
+    // —medido: se probó quitándola— y el defecto aparecería en la siguiente columna que alguien
+    // añadiera sin `name:`. Este caso caza la causa; aquel, el efecto.
+    expect(options.namingStrategy).toBeInstanceOf(SnakeNamingStrategy);
+  });
 
   it('debería trasladar los parámetros del pool a las opciones de pg', () => {
     // Arrange

@@ -28,9 +28,12 @@ const ADMIN_NAME = 'Administrator';
  * consigue con compensación (`RegisterAccountUseCase`), porque ahí los dos contextos no
  * comparten transacción por diseño.
  *
- * Todas las columnas van en snake_case. No hay `NamingStrategy` configurada, así que cada una lo
- * consigue por su `name:` explícito en la ORM entity — sin él, TypeORM usaría el nombre de la
- * propiedad y `createdAt` nacería en camel, que es como estuvo el esquema hasta el 2026-08-24.
+ * Todas las columnas van en snake_case, y desde el 2026-08-25 lo consiguen solas:
+ * `SnakeNamingStrategy` las deriva del nombre de la propiedad. Antes cada una dependía de que su
+ * decorador llevara `name:`, y olvidarlo hacía nacer la columna en camel — que es como estuvo el
+ * esquema hasta el 2026-08-24. Este archivo escribe SQL crudo, así que los nombres que teclea
+ * aquí no pasan por la estrategia: los cubre `schema-conventions.e2e-spec.ts`, que compara el
+ * esquema real contra la convención.
  *
  * **El seed SE ATRIBUYE sus escrituras con `SYSTEM_ACTORS.ADMIN_SEED`**, en los dos INSERT y en
  * los dos UPDATE. ⚠️ Esto INVIERTE lo que este mismo comentario decía hasta el 2026-08-25 —«el
