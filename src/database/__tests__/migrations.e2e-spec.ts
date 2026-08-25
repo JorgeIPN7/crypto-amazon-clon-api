@@ -16,7 +16,17 @@ loadEnv({ path: ['.env.local', '.env'], quiet: true });
 
 const PROBE_DATABASE = `migrations_probe_${process.pid}`;
 
-const TABLES = ['users', 'auth_credentials', 'orders', 'orders_outbox'] as const;
+/**
+ * Las tablas esperadas se DERIVAN de las ORM entities registradas, nunca de una lista escrita a
+ * mano. Con la lista fija, el caso se rompía al añadir un módulo nuevo con un mensaje que no
+ * hablaba del defecto —«esperaba 4 tablas, hay 5»—; medido generando un módulo con
+ * `pnpm module:new`, que es exactamente el flujo en el que más molesta.
+ *
+ * Derivarlas además hace el caso MÁS valioso: ahora detecta lo contrario, una entidad declarada
+ * cuya tabla ninguna migración crea, que es un defecto real y silencioso hasta el primer INSERT.
+ */
+const expectedTables = (dataSource: DataSource): string[] =>
+  [...new Set(dataSource.entityMetadatas.map((metadata) => metadata.tableName))].sort();
 
 const USER_ID = '9d2a1c7e-1f6b-4a2e-9c3d-77a1b0e5f012';
 const HASH = '$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRzb21lc2FsdA$aBcDeFgHiJkLmNoPqRsTuVw';
@@ -151,12 +161,12 @@ describe('migraciones (e2e)', () => {
   }, 60_000);
 
   describe('el set completo', () => {
-    it('debería aplicarse entero y dejar las cuatro tablas del esquema', async () => {
+    it('debería aplicarse entero y crear una tabla por cada ORM entity registrada', async () => {
       // Act
       await probe.runMigrations({ transaction: 'all' });
 
       // Assert
-      expect(await existingTables()).toEqual([...TABLES].sort());
+      expect(await existingTables()).toEqual(expectedTables(probe));
     }, 60_000);
 
     it('debería revertirse entero y no dejar ninguna tabla de dominio', async () => {

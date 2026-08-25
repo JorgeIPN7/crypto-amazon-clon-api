@@ -57,7 +57,8 @@
     "prebuild": "pnpm assets:scalar",
     "prestart:dev": "pnpm assets:scalar",
     "pretest:e2e": "pnpm assets:scalar",
-    "pretest:e2e:ci": "pnpm assets:scalar"
+    "pretest:e2e:ci": "pnpm assets:scalar",
+    "module:new": "node scripts/generate-module.mjs"
   },
   "dependencies": {
     "@nestjs/common": "11.2.1",
