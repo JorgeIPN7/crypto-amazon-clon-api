@@ -77,13 +77,28 @@
 
 **Casos acordados** (Tabla A):
 
-| #   | Caso (se vuelve el `it`)                                                     | Entrada / estado inicial      | Resultado esperado                    |
-| --- | ---------------------------------------------------------------------------- | ----------------------------- | ------------------------------------- |
-| A1  | debería exponer como `name` el nombre de la clase concreta, no el de la base | `new ConcreteError('x')`      | `name === 'ConcreteError'`            |
-| A2  | debería conservar el mensaje recibido                                        | `new ConcreteError('texto')`  | `message === 'texto'`                 |
-| A3  | debería ser instancia de su marcador de módulo y de `DomainError`            | `new ConcreteError('x')`      | ambos `instanceof` en `true`          |
-| A4  | debería no ser capturado por el marcador de otro módulo                      | `new OtherConcreteError('x')` | `instanceof MarkerA` en `false`       |
-| A5  | debería seguir siendo un `Error` nativo con `stack`                          | `new ConcreteError('x')`      | `instanceof Error` y `stack` definido |
+| #      | Caso (se vuelve el `it`)                                                     | Entrada / estado inicial      | Resultado esperado                    |
+| ------ | ---------------------------------------------------------------------------- | ----------------------------- | ------------------------------------- |
+| A1     | debería exponer como `name` el nombre de la clase concreta, no el de la base | `new ConcreteError('x')`      | `name === 'ConcreteError'`            |
+| A2     | debería conservar el mensaje recibido                                        | `new ConcreteError('texto')`  | `message === 'texto'`                 |
+| A3     | debería ser instancia de su marcador de módulo y de `DomainError`            | `new ConcreteError('x')`      | ambos `instanceof` en `true`          |
+| A4     | debería no ser capturado por el marcador de otro módulo                      | `new OtherConcreteError('x')` | `instanceof MarkerA` en `false`       |
+| A5     | debería seguir siendo un `Error` nativo con `stack`                          | `new ConcreteError('x')`      | `instanceof Error` y `stack` definido |
+| **A6** | debería no declarar un `Symbol.hasInstance` propio                           | la clase `DomainError`        | no está entre sus símbolos propios    |
+
+⚠️ **A6 se añadió por confirmación JIT del usuario al cerrar el ciclo, no estaba en la tabla
+original.** Cierra el único agujero conocido que **ni los tests ni Stryker pueden atrapar**:
+añadir un `static [Symbol.hasInstance]` a `DomainError` haría que los tres marcadores lo heredaran
+por la cadena estática de prototipos, e `instanceof` dejaría de mirar la cadena real —
+`@Catch(UserDomainError)` empezaría a capturar errores de `auth`. **A4 caería en silencio** y A1,
+A2, A3 y A5 seguirían verdes. Verificado ejecutándolo durante el Lote 1.
+
+Stryker no puede detectarlo porque sus mutadores **mutan código existente y no pueden AÑADIR un
+miembro estático nuevo**. Y es una adición de buena fe plausible: alguien podría ponerla para que
+los filtros capturen también errores de librerías externas.
+
+⚠️ **A6 nace VERDE**, como B6 y C10. Se valida al revés: añadiendo el método y comprobando que el
+caso cae.
 
 **Files:**
 

@@ -68,8 +68,22 @@
  * `error` incluyen uno estructural nuevo — `domain-error.base.ts` genera un único mutante
  * (vaciar el constructor) que revienta con `ReferenceError: Must call super constructor…` y
  * queda fuera del denominador. No es laguna de cobertura: es que tres líneas de reenvío puro no
- * dan superficie a los mutadores. ⚠️ Con la salvedad de que Stryker trata `NaN >= 85` como
- * umbral cumplido: si `shared/domain/` se llenara de archivos así, el gate pasaría sin señal.
+ * dan superficie a los mutadores.
+ *
+ * ⚠️ **Un scope SIN mutantes válidos pasa el gate, y conviene saber por qué.** No es que Stryker
+ * dé el umbral por cumplido: es que su comprobación es `if (mutationScore < breaking)`
+ * (`mutation-test-report-helper.js:135`), y en JavaScript `NaN < 85` es **`false`**, así que la
+ * rama de fallo no se ejecuta nunca. El mensaje que imprime —«Final mutation score of NaN is
+ * greater than or equal to break threshold 85»— es literalmente falso: `NaN` no es mayor ni
+ * igual a nada. Medido: `pnpm test:mutation --mutate "src/shared/domain/domain-error.base.ts"`
+ * (cuyo único mutante es `error`) sale con **exit 0**. Stryker no ofrece ninguna opción de
+ * «mínimo de mutantes» — buscada en su schema y en sus tipos.
+ *
+ * Con el scope real esto es inalcanzable (319 mutantes válidos), así que **el riesgo no es la CI:
+ * es la interpretación**. Ya costó una conclusión equivocada en el ciclo del 2026-08-22 — se
+ * midió `orders` con `--mutate` en aislado, dio 85.11 % y se reportó que la CI estaba a 0.11
+ * puntos de romperse, cuando el margen real era 9.44. Un scope acotado no dice a qué distancia
+ * está el gate, y un scope acotado sin lógica mutable no dice nada en absoluto.
  *
  * El umbral se queda en 85 por el mismo criterio de siempre: subirlo a cuenta de un kernel que
  * nace con casos frescos premiaría el momento, no la disciplina.

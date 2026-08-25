@@ -436,6 +436,26 @@ Related: Zod's `.default()` only fires on `undefined`, so a variable that is pre
 
 ## Code conventions
 
+- **Un comentario que afirma un hecho comprobable lleva la medición al lado, o no se escribe.**
+  Vale para «no compila», «está prohibido por el gate», «se repite N veces», «ningún test lo
+  detecta», «es seguro en un despliegue rodante». Todas esas frases se verifican con una línea de
+  shell, un `tsc` o rompiendo el código a propósito — y el comentario debe decir **cómo** se
+  verificó, no solo afirmar. La forma que ya usa el repo es «medido, no supuesto», seguida del
+  dato.
+
+  No es celo: **en el ciclo del 2026-08-22 se detectaron NUEVE afirmaciones falsas** en
+  comentarios, todas escritas con la misma seguridad que las ciertas. Decían, entre otras cosas,
+  que el gate de fronteras alcanzaba a los tests (no lo hace, `boundaries/ignore` los excluye),
+  que TypeScript prohíbe sentencias antes de `super()` (no las prohíbe, solo tocar `this`), que
+  un test de ida y vuelta no cubría dos columnas (cubría), que un literal se repetía 18 veces (se
+  repetía 8), y que una migración aditiva era segura en rodado (no lo era, y ese fue el defecto
+  más caro del ciclo). Las nueve las cazó una revisión que fue a comprobar; ninguna la habría
+  cazado un gate.
+
+  Un comentario equivocado es peor que ninguno: el siguiente que lo lea tomará una decisión
+  apoyándose en él. Si no lo mediste, escribe que no lo mediste — es una frase perfectamente
+  aceptable y el repo la usa.
+
 - **Code in English, prose in Spanish.** Identifiers, object keys, file and folder names, env variables, config keys, SQL columns, `operationId` and form ids are English; comments, documentation, OpenAPI `summary`/`description`, ESLint rule messages and operator-facing messages are Spanish. `src/__tests__/language-convention.spec.ts` enforces it by asserting on **identifiers, never on strings** — which is why the Spanish `it` titles need no exemption. One written exception: the error messages in `env.schema.ts` and `validate-env.ts` are English because they share a string with Zod's untranslatable defaults.
 - **`type`, never `interface`.** ESLint enforces `@typescript-eslint/consistent-type-definitions: ['error', 'type']`. Skill reference files use `interface` as language-agnostic pseudocode — translate it before writing real code. Ports are the one place that is neither: they're `abstract class`, because they must survive compilation to act as their own DI token (see Architecture rules).
 - **Path aliases:** `@/` → `src/`, plus `@common/`, `@config/`, `@database/`, `@modules/`, `@shared/`, and `@test/` → `test/`. Shared test helpers are imported via `@test/`, not `@/`. Declared in three places that must stay in sync: `tsconfig.json`, `.swcrc` and `jest.config.mjs` — `test/jest-e2e.config.mjs` inherits from the latter instead of keeping its own copy.

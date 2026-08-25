@@ -24,8 +24,22 @@ export type LanguageViolation = {
  * Falla en cerrado por el mismo criterio que la lista del selector de `eslint.config.mjs`:
  * una raíz nueva cuesta una línea revisada, y a cambio ninguna palabra inglesa legítima se
  * marca sola. Por eso NO entran las palabras que se escriben igual en los dos idiomas
- * (`total`, `error`, `final`, `local`, `normal`, `original`, `general`): añadirlas pondría
- * roja media base de código.
+ * (`total`, `error`, `final`, `local`, `normal`, `original`, `general`, `actor`): añadirlas
+ * pondría roja media base de código. `actor` está en esa lista por medición y no por criterio:
+ * se añadió a las raíces del 2026-08-22 y puso rojas **siete** declaraciones legítimas —
+ * `ACTOR_ID` en cuatro specs, el `actor` de `users.controller.ts` y el nombre de una clase de
+ * migración— antes de retirarla.
+ *
+ * ⚠️ **La contrapartida, dicha en voz alta: esta lista NO protege la convención, solo las
+ * raíces que alguien pensó en escribir.** Medido en el ciclo del 2026-08-22 — de once palabras
+ * españolas que aparecieron o estuvieron a punto de aparecer en identificadores, **diez no
+ * estaban** y habrían pasado el gate; dos llegaron a commitearse (`reactivadoEn`, `haciaAtras`)
+ * y las cazó un `grep` a mano, no esta suite. Las diez se añadieron al final del bloque.
+ *
+ * **Cómo crece: por hallazgo, nunca por barrido preventivo.** Cuando una palabra española se
+ * cuela en un identificador, se corrige el identificador Y se añade aquí su raíz, en el mismo
+ * cambio. Adivinar vocabulario por adelantado infla la lista sin cerrar nada — el vocabulario
+ * que de verdad se usa depende de lo que se esté construyendo ese ciclo.
  */
 export const SPANISH_ROOTS: ReadonlySet<string> = new Set(
   `
@@ -38,6 +52,7 @@ export const SPANISH_ROOTS: ReadonlySet<string> = new Set(
     obtener orden ordenes origen pagina pais pedido pedidos perfil precio previo problema
     propuesta prueba pruebas registro reproduccion respuesta resultado saldo salida semilla
     sesion sobre solicitud tamano telefono titulo tomado usuario usuarios valido valor valores
+    anterior atras congelada hacia instante mutado reactivado sonda traza
   `
     .trim()
     .split(/[^a-z0-9]+/),

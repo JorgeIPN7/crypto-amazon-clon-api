@@ -48,6 +48,25 @@ describe('DomainError', () => {
       expect(error).toBeInstanceOf(Error);
       expect(error.stack).toBeDefined();
     });
+
+    // A6. Cierra el único agujero conocido que ni los tests ni Stryker pueden atrapar. Un
+    // `static [Symbol.hasInstance]` en `DomainError` lo heredarían los tres marcadores por la
+    // cadena ESTÁTICA de prototipos, e `instanceof` dejaría de mirar la cadena real: A4 caería
+    // en silencio mientras A1, A2, A3 y A5 siguen verdes. Medido durante el Lote 1.
+    //
+    // Stryker no lo ve porque sus mutadores mutan código existente y no pueden AÑADIR un miembro
+    // estático. Y no es un ataque rebuscado: es una adición de buena fe plausible —alguien podría
+    // ponerla para que los filtros capturen también errores de librerías externas.
+    //
+    // El caso mira los símbolos PROPIOS, no `DomainError[Symbol.hasInstance]`: eso último
+    // siempre existe, heredado de `Function.prototype`, y la aserción pasaría siempre.
+    it('debería no declarar un Symbol.hasInstance propio', () => {
+      // Arrange + Act
+      const ownSymbols = Object.getOwnPropertySymbols(DomainError);
+
+      // Assert
+      expect(ownSymbols).not.toContain(Symbol.hasInstance);
+    });
   });
 });
 
