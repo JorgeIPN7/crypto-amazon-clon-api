@@ -29,7 +29,7 @@ export type FindUsersCriteria = {
  *   - Un CAMPO —público, `protected` o `private`— o una parameter property SÍ rompe el fake
  *     por objeto literal: `TS2741: Property 'x' is missing in type '{ … }' but required in
  *     type 'Port'`. Hay un fake real así en
- *     `orders/__tests__/infrastructure/users-customer.directory.spec.ts`.
+ *     `orders/__tests__/infrastructure/gateways/users-customer.directory.spec.ts`.
  *   - Un `protected constructor()` VACÍO no rompe nada: el objeto literal sigue asignando sin
  *     un solo error. Se prohíbe por otra razón — los adaptadores hacen `implements` y jamás
  *     `extends`, así que el puerto no entra en su cadena de prototipos y ese constructor NO
@@ -45,5 +45,10 @@ export abstract class UserRepository {
   abstract findByEmail(email: Email): Promise<User | null>;
   abstract findMany(criteria: FindUsersCriteria): Promise<UserPage>;
   abstract save(user: User): Promise<void>;
-  abstract delete(id: UserId): Promise<void>;
 }
+
+// `delete()` se retiró del puerto el 2026-08-25. Era el único borrado FÍSICO del repo y su único
+// llamante —la compensación del alta— ahora marca el perfil con `User.softDelete()` y lo guarda
+// con `save()`, que es donde debe estar la decisión: en el agregado, no en el adaptador. Un
+// puerto que expone `delete` invita a llamarlo, y sobre un esquema con cero foreign keys eso
+// deja órdenes y credenciales apuntando al vacío sin que el motor diga nada.

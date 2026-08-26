@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import { SYSTEM_ACTORS } from '@shared/domain/system-actor';
+
 import { Credential } from '../../domain/entities/credential.entity';
 import { EmailAlreadyRegisteredError, InvalidProfileError } from '../../domain/errors/auth.errors';
 import { CredentialRepository } from '../../domain/ports/credential.repository';
@@ -80,8 +82,21 @@ export class RegisterAccountUseCase {
     }
 
     try {
+      // `PUBLIC_REGISTRATION` y no `null`: `POST /auth/register` es `@Public()`, la petición no
+      // trae token y no hay `sub` que anotar — pero SÍ se sabe qué lo escribió, y `null` diría
+      // que no se sabe (ver `SYSTEM_ACTORS`). Poner aquí `created.user.id` diría que la cuenta se
+      // creó a sí misma, que no es una afirmación que la traza deba hacer.
+      //
+      // El perfil recibe el MISMO actor desde `CreateUserUseCase`, al otro lado de la fachada:
+      // las dos filas de un alta nacen con la misma atribución, que es lo que permite leerlas
+      // como un solo hecho.
       await this.credentials.save(
-        Credential.create({ userId: created.user.id, passwordHash, now: new Date() }),
+        Credential.create({
+          userId: created.user.id,
+          passwordHash,
+          now: new Date(),
+          createdBy: SYSTEM_ACTORS.PUBLIC_REGISTRATION,
+        }),
       );
     } catch (error) {
       // Compensación. El `await` es deliberado: propagar antes de terminar el borrado

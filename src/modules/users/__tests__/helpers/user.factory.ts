@@ -12,22 +12,32 @@ import { UserId } from '../../domain/value-objects/user-id.vo';
  */
 const DEFAULT_NOW = new Date('2026-07-27T10:00:00.000Z');
 
+/**
+ * Actor por defecto de la traza. `null` —el sistema— y no un id inventado, porque es lo que
+ * produce el ÚNICO camino de alta que existe hoy: `POST /auth/register`, que es `@Public()`.
+ * Un factory que pusiera un actor por defecto describiría un alta que el sistema no hace.
+ */
+const DEFAULT_CREATED_BY = null;
+
 type BuildUserOverrides = {
   email?: string;
   name?: string;
   now?: Date;
+  createdBy?: string | null;
 };
 
 export const buildUser = ({
   email = 'usuario@example.com',
   name = 'Usuario de Prueba',
   now = DEFAULT_NOW,
+  createdBy = DEFAULT_CREATED_BY,
 }: BuildUserOverrides = {}): User =>
   User.create({
     id: UserId.generate(),
     email: Email.from(email),
     name,
     now,
+    createdBy,
   });
 
 /** Atajo para el caso más frecuente: lo único que distingue a un usuario de otro. */
@@ -36,6 +46,6 @@ export const buildUserWithEmail = (email: string): User => buildUser({ email });
 /** Usuario ya desactivado, para los casos que dependen del estado y no de la transición. */
 export const buildInactiveUser = (email: string): User => {
   const user = buildUser({ email });
-  user.deactivate(DEFAULT_NOW);
+  user.deactivate(DEFAULT_NOW, null);
   return user;
 };

@@ -46,7 +46,7 @@ describe('CredentialTypeOrmRepository (e2e)', () => {
       // Assert: fila cruda, no releída por el mismo mapper que la escribió.
       const rows = await dataSource.query<{ user_id: string; password_hash: string }[]>(
         'SELECT user_id, password_hash FROM auth_credentials WHERE id = $1',
-        [credential.id],
+        [credential.id.value],
       );
       expect(rows).toEqual([
         { user_id: credential.userId, password_hash: credential.passwordHash.value },
@@ -75,7 +75,7 @@ describe('CredentialTypeOrmRepository (e2e)', () => {
       const found = await repository.findByUserId(credential.userId);
 
       // Assert
-      expect(found?.id).toBe(credential.id);
+      expect(found?.id.value).toBe(credential.id.value);
       expect(found?.passwordHash.value).toBe(credential.passwordHash.value);
     });
 
@@ -128,4 +128,5 @@ const buildCredential = ({ userId = randomUUID() }: { userId?: string } = {}): C
     userId,
     passwordHash: PasswordHash.from('$argon2id$fake$repository'),
     now: new Date('2026-08-07T10:00:00.000Z'),
+    createdBy: null,
   });

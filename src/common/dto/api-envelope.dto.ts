@@ -8,16 +8,20 @@ import {
   type ApiResponseOptions,
 } from '@nestjs/swagger';
 
+import { REQUEST_ID, TIMESTAMP } from './error-example.factory';
 import { PaginatedResponseDto, PaginationMetaDto } from './paginated-response.dto';
 
 export class RequestMetaDto {
-  @ApiProperty({ example: '2026-07-28T10:15:00.000Z' })
+  // Las constantes de la factoría, no literales propios: este esquema y los `example` de los
+  // controllers describen el MISMO bloque `request`, y aquí el `timestamp` llevaba
+  // `2026-07-28` mientras todos los ejemplos publicados decían `2026-08-01`.
+  @ApiProperty({ example: TIMESTAMP })
   timestamp!: string;
 
   @ApiProperty({ example: '/api/v1/users' })
   path!: string;
 
-  @ApiProperty({ example: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' })
+  @ApiProperty({ example: REQUEST_ID })
   requestId!: string;
 }
 

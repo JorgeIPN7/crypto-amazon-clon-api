@@ -3,18 +3,30 @@ import { STATUS_CODES } from 'node:http';
 import type { ErrorPayload } from '../filters/all-exceptions.filter';
 
 /**
- * Fija los campos que no aportan nada al leer un ejemplo, para que dos ejemplos de endpoints
- * distintos solo difieran en lo que de verdad los distingue.
+ * Instante y request-id de TODOS los ejemplos publicados. Fijan los campos que no aportan nada
+ * al leer un ejemplo, para que dos ejemplos de endpoints distintos solo difieran en lo que de
+ * verdad los distingue.
+ *
+ * **Se exportan** porque el mismo par aparece en los ejemplos de éxito de los controllers y en
+ * los `@ApiProperty` de `api-envelope.dto.ts` y `error-response.dto.ts`, no solo en los cuerpos
+ * de error que construye `buildErrorExample`. Tenerlo escrito a mano en cada sitio era la vía
+ * por la que el literal del request-id acabó repetido: **8 ocurrencias en fuente no-test —una
+ * declaración y siete copias—, reducidas aquí a una**, sin nada que las obligara a coincidir.
+ *
+ * El grep a secas devuelve 18, y ese número engaña: las otras diez viven en tests y **nueve no
+ * son request-ids**, sino el mismo UUID reutilizado como id de usuario o de cliente
+ * (`users.e2e-spec.ts`, `user-id.vo.spec.ts`, `orders.e2e-spec.ts`…). Ni las tocó este cambio ni
+ * debía tocarlas.
  */
-const TIMESTAMP = '2026-08-01T10:15:00.000Z';
-const REQUEST_ID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+export const TIMESTAMP = '2026-08-01T10:15:00.000Z';
+export const REQUEST_ID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
 
 /**
  * Status cuyo `error` **no** es el nombre canónico del status, con el motivo medido.
  *
  * `AllExceptionsFilter` calcula `error` como `body.error ?? exception.name`. Cuando una
  * `HttpException` se construye con un string —`new ConflictException('...')`, que es lo que hace
- * `UserDomainExceptionFilter`— Nest rellena `body.error` con el nombre canónico, así que el
+ * `UsersDomainExceptionFilter`— Nest rellena `body.error` con el nombre canónico, así que el
  * nombre de la clase de dominio nunca llega al cliente. Estas dos son las excepciones reales:
  *
  * - **429:** `ThrottlerException` se construye con un string suelto, así que el filtro entra en

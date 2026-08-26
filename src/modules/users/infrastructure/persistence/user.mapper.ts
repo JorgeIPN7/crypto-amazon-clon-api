@@ -1,7 +1,7 @@
 import { Email } from '../../domain/value-objects/email.vo';
 import { User } from '../../domain/entities/user.entity';
 import { UserId } from '../../domain/value-objects/user-id.vo';
-import type { UserRole } from '../../domain/value-objects/user-role';
+import type { UserRole } from '../../domain/user-role';
 
 import { UserOrmEntity } from './user.orm-entity';
 
@@ -9,6 +9,11 @@ import { UserOrmEntity } from './user.orm-entity';
  * Única frontera entre la fila de la tabla y el agregado. Al reconstituir se usa
  * `rehydrate`, no `create`: los datos ya persistidos no vuelven a pasar por las reglas
  * de creación, porque eran válidos cuando se guardaron.
+ *
+ * Los dos actores de la traza viajan TAL CUAL, `null` incluido y sin coalescer a nada: el `null`
+ * de la columna significa «lo escribió el sistema» y es un valor legítimo del dominio, no un
+ * hueco que rellenar. Las filas anteriores a `AddAuditActorColumns` también leen `null`, que es
+ * la respuesta correcta: no se sabe quién las escribió.
  */
 export const UserMapper = {
   toDomain(row: UserOrmEntity): User {
@@ -23,6 +28,9 @@ export const UserMapper = {
       active: row.active,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      createdBy: row.createdBy,
+      updatedBy: row.updatedBy,
+      deletedAt: row.deletedAt,
     });
   },
 
@@ -36,6 +44,9 @@ export const UserMapper = {
     row.active = snapshot.active;
     row.createdAt = snapshot.createdAt;
     row.updatedAt = snapshot.updatedAt;
+    row.createdBy = snapshot.createdBy;
+    row.updatedBy = snapshot.updatedBy;
+    row.deletedAt = snapshot.deletedAt;
     return row;
   },
 };

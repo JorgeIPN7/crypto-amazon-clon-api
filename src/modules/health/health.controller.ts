@@ -18,6 +18,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { ApiStandardErrors } from '@common/decorators/api-standard-errors.decorator';
 import { Public } from '@common/decorators/public.decorator';
 import { SkipTransform } from '@common/decorators/skip-transform.decorator';
+import { REQUEST_ID, TIMESTAMP } from '@common/dto/error-example.factory';
 import type { AppConfig } from '@config/app.config';
 
 /**
@@ -118,9 +119,9 @@ const serviceUnavailableSchema = (path: string) => ({
         'ordenado (`shutting_down`) y no un indicador concreto.',
       'down',
     ),
-    timestamp: { type: 'string', format: 'date-time', example: '2026-08-01T10:15:00.000Z' },
+    timestamp: { type: 'string', format: 'date-time', example: TIMESTAMP },
     path: { type: 'string', example: path },
-    requestId: { type: 'string', example: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' },
+    requestId: { type: 'string', example: REQUEST_ID },
   },
 });
 
@@ -143,9 +144,9 @@ const serviceUnavailable = ({
     statusCode: 503,
     message: 'Service Unavailable Exception',
     error,
-    timestamp: '2026-08-01T10:15:00.000Z',
+    timestamp: TIMESTAMP,
     path,
-    requestId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+    requestId: REQUEST_ID,
   },
 });
 

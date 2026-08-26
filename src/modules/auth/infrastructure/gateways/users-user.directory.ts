@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
-import { UsersLookup, UsersProvisioning, type UserSummary } from '../../users/users.module';
+import { UsersLookup, UsersProvisioning, type UserSummary } from '../../../users/users.module';
 
 import {
   UserDirectory,
   type CreateProfileResult,
   type DirectoryUser,
-} from '../domain/ports/user-directory';
+} from '../../domain/ports/user-directory';
 
 /**
  * Anti-corruption layer: implementa el puerto que `auth` definió inyectando las puertas que
@@ -32,6 +32,13 @@ import {
  * «Campo a campo» incluye los RECHAZOS, no solo el éxito — casos D7 y D8 de la Tabla D. El
  * `return result` de la rama de fallo era exactamente el agujero que esta regla existe para
  * tapar, y compilaba sin una queja.
+ *
+ * **Vive en `infrastructure/gateways/`**, no suelto en `infrastructure/` como hasta el
+ * 2026-08-25. Los demás adaptadores del repo cuelgan siempre de una subcarpeta que dice CON QUÉ
+ * hablan (`http/`, `persistence/`, `security/`); estos dos eran los únicos a pelo, y quedaban
+ * mezclados con las carpetas en el listado del módulo. `gateways/` es el sitio de un adaptador
+ * que habla con OTRO CONTEXTO o con un sistema externo — que es lo que distingue a un
+ * anti-corruption layer de un repositorio.
  */
 @Injectable()
 export class UsersUserDirectory implements UserDirectory {

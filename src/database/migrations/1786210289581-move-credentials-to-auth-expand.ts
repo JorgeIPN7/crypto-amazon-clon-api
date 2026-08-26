@@ -33,10 +33,12 @@ const UNRESTORABLE_IN_MESSAGE = 10;
  * se añade cuando la ventana no puede tener altas; en este repo la ventana es un despliegue y
  * el coste de un alta perdida es que ese usuario reintente.
  *
- * Comillas camelCase en `"createdAt"`/`"updatedAt"`: no hay `NamingStrategy`, así que TypeORM
- * usa el nombre de la propiedad tal cual (misma lección que `AddAuthColumnsToUsers`). Las
- * columnas nuevas snake_case (`user_id`, `password_hash`) lo son por `name:` explícito en
- * `CredentialOrmEntity`.
+ * Todas las columnas van en snake_case. Cuando esta migración se escribió lo conseguían por el
+ * `name:` explícito de `CredentialOrmEntity`; desde el 2026-08-25 lo pone `SnakeNamingStrategy` y
+ * los `name:` se retiraron. El SQL de aquí no cambia —ya estaba en snake— pero la explicación sí,
+ * porque decía que no había estrategia configurada y ahora la hay. Sin ella, TypeORM usaría el
+ * nombre de la propiedad y la columna nacería `createdAt`. Fue así hasta el 2026-08-24, cuando
+ * esta tabla mezclaba `user_id` y `password_hash` en snake con `"createdAt"` y `"updatedAt"` en camel.
  *
  * Sin cualificar el schema, como todas las migraciones del repo: ambos sentidos heredan el
  * `search_path` de la conexión, que sale de `DB_SCHEMA`.
@@ -50,8 +52,8 @@ export class MoveCredentialsToAuthExpand1786210289581 implements MigrationInterf
         "id" uuid NOT NULL,
         "user_id" uuid NOT NULL,
         "password_hash" character varying(255) NOT NULL,
-        "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-        "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL,
+        "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL,
         CONSTRAINT "pk_auth_credentials" PRIMARY KEY ("id")
       )
     `);
@@ -80,20 +82,20 @@ export class MoveCredentialsToAuthExpand1786210289581 implements MigrationInterf
     //
     // Qué significa exactamente cada una, sin venderlo como exacto:
     //
-    //  - `createdAt` ← `users."createdAt"`. Hasta esta migración el hash era una columna de
+    //  - `createdAt` ← `users."created_at"`. Hasta esta migración el hash era una columna de
     //    `users`, así que la credencial nació con el perfil: la fecha es la buena. Deja de
     //    serlo solo si el alta y el primer password no fueron el mismo acto, y en este repo
     //    (`RegisterAccountUseCase`, `seed:admin`) siempre lo son.
     //
-    //  - `updatedAt` ← `users."updatedAt"`. Aquí sí hay aproximación, y va hacia el lado
-    //    optimista: `users."updatedAt"` se movía con CUALQUIER escritura de la fila —cambio de
+    //  - `updatedAt` ← `users."updated_at"`. Aquí sí hay aproximación, y va hacia el lado
+    //    optimista: `users."updated_at"` se movía con CUALQUIER escritura de la fila —cambio de
     //    nombre, de rol, desactivación—, no solo con un cambio de contraseña. Es una COTA
     //    SUPERIOR: la credencial se cambió en esa fecha o antes, nunca después. Quien monte una
     //    política de rotación sobre esta columna debe saber que para las filas migradas puede
     //    estar sobrestimando la frescura del hash; la cota inferior honesta es `createdAt`.
     await queryRunner.query(`
-      INSERT INTO "auth_credentials" ("id", "user_id", "password_hash", "createdAt", "updatedAt")
-      SELECT gen_random_uuid(), "id", "password_hash", "createdAt", "updatedAt" FROM "users"
+      INSERT INTO "auth_credentials" ("id", "user_id", "password_hash", "created_at", "updated_at")
+      SELECT gen_random_uuid(), "id", "password_hash", "created_at", "updated_at" FROM "users"
     `);
 
     // El paso que hace que expand/contract funcione de verdad en este caso, y no un detalle

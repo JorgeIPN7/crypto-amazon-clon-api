@@ -10,7 +10,7 @@ import { OrdersController } from './infrastructure/http/orders.controller';
 import { OrderOrmEntity } from './infrastructure/persistence/order.orm-entity';
 import { OrderTypeOrmRepository } from './infrastructure/persistence/order.typeorm.repository';
 import { OutboxMessageOrmEntity } from './infrastructure/persistence/outbox-message.orm-entity';
-import { UsersCustomerDirectory } from './infrastructure/users-customer.directory';
+import { UsersCustomerDirectory } from './infrastructure/gateways/users-customer.directory';
 
 /**
  * Composition root del contexto. `UsersModule` se importa por su module file — la única

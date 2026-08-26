@@ -119,7 +119,7 @@ describe('seedAdmin (e2e)', () => {
     // Arrange
     const existingName = 'Usuario Preexistente';
     await dataSource.query(
-      `INSERT INTO users (id, email, name, role, active, "createdAt", "updatedAt")
+      `INSERT INTO users (id, email, name, role, active, "created_at", "updated_at")
        VALUES ($1, $2, $3, 'user', true, now(), now())`,
       [randomUUID(), ADMIN_EMAIL, existingName],
     );
@@ -141,7 +141,7 @@ describe('seedAdmin (e2e)', () => {
   it('debería crear la credencial de un usuario preexistente que no la tenía', async () => {
     // Arrange
     await dataSource.query(
-      `INSERT INTO users (id, email, name, role, active, "createdAt", "updatedAt")
+      `INSERT INTO users (id, email, name, role, active, "created_at", "updated_at")
        VALUES ($1, $2, 'Sin Credencial', 'user', true, now(), now())`,
       [randomUUID(), ADMIN_EMAIL],
     );
@@ -166,7 +166,7 @@ describe('seedAdmin (e2e)', () => {
   it('debería reactivar al admin desactivado y dejarlo entrar', async () => {
     // Arrange
     await dataSource.query(
-      `INSERT INTO users (id, email, name, role, active, "createdAt", "updatedAt")
+      `INSERT INTO users (id, email, name, role, active, "created_at", "updated_at")
        VALUES ($1, $2, 'Admin Desactivado', 'admin', false, now(), now())`,
       [randomUUID(), ADMIN_EMAIL],
     );

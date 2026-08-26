@@ -166,19 +166,38 @@ el auditor, no cómo se escribe un test.
 
 ## Architecture rules
 
-Every bounded context lives under `src/modules/<context>/` with layers **inside** it — never at the root of `src/`. **`src/modules/users/` is the reference implementation**: copy its shape for any new context. There are three: `users` (profiles), `auth` (credentials and tokens) and `orders`, plus the flat `health`.
+Every bounded context lives under `src/modules/<context>/` with layers **inside** it — never at the root of `src/`. **`src/modules/users/` is the reference implementation**, but **not everything in it is
+mandatory** — it has a two-token segregated facade, pagination and driver-error translation
+because it needs them. `docs/module-blueprint.md` is the list of what is required and what is
+optional, plus the order to build it in; `pnpm module:new <context> [entity]` generates every
+required piece already passing typecheck, lint (boundaries included), format and its own tests. There are three: `users` (profiles), `auth` (credentials and tokens) and `orders`, plus the flat `health`.
 
 ```
 src/modules/<context>/
 ├── domain/           # zero @nestjs/* imports; entities, VOs, events, ports/, errors/
 ├── application/      # @Injectable OK; no ORM or HTTP clients; use-cases/ + the context's facade
-├── infrastructure/   # the only layer touching external libs; http/, persistence/, messaging/
+├── infrastructure/   # the only layer touching external libs; http/, persistence/, gateways/, messaging/
 ├── __tests__/        # mirrors the structure above
 └── <context>.module.ts
 ```
 
 - **Dependency rule:** outer → inner only. `domain/` imports nothing from `@nestjs/*`, ORMs, `axios`, `class-validator` decorators, or `pino`.
 - **Controllers are driver adapters** → they live in `infrastructure/http/`.
+- **Every adapter lives in a subfolder that says what it talks to.** `http/` (transport),
+  `persistence/` (the ORM), `security/` (crypto libraries) and `gateways/` — the one for an
+  adapter that talks to **another bounded context** or to an external system, which is what
+  distinguishes an anti-corruption layer from a repository. `UsersUserDirectory` (auth) and
+  `UsersCustomerDirectory` (orders) hung loose from `infrastructure/` until 2026-08-25 and were
+  the only two that did.
+- **`domain/value-objects/` holds only what extends `ValueObject`.** A domain enum, a constant
+  or an auxiliary type goes loose in `domain/` — `users/domain/user-role.ts` is the only such
+  case today, and it lived in `value-objects/` until 2026-08-25, which made that folder mean
+  "domain things that aren't entities". That means nothing.
+- **A context-wide adapter is named after the CONTEXT, not the entity.** The exception filter is
+  `users-domain-exception.filter.ts` / `UsersDomainExceptionFilter` (plural), same as
+  `users.controller.ts` and `users.module.ts`, because it translates any `UserDomainError` no
+  matter where it came from. The marker error stays singular: it talks about a user, not about
+  the context.
 - **Ports are `abstract class`, never `type` + `Symbol` token.** A class survives compilation, so one single reference is both the contract's type and its injection token — Nest accepts `Abstract<T>` as an `InjectionToken` and SWC emits it into `design:paramtypes`. The module wires `{ provide: UserRepository, useClass: UserTypeOrmRepository }` and **no consumer needs `@Inject`**. No `Port` suffix: `UserRepository` doesn't collide, TypeORM's `Repository` only shows up inside the adapter with its own import. Three consequences, all load-bearing:
   - **A port declares only public `abstract` members** — no fields, no `protected`/`private`, no constructor. Two bans, two different causes, both measured with `tsc 6.0.3 --noEmit --strict`. A **field** (public, `protected` or `private`) or a **parameter property** makes the object-literal fakes stop compiling (`TS2741`; there is a real fake in `orders/__tests__/infrastructure/users-customer.directory.spec.ts`). An **empty `protected constructor()` compiles fine** — it is banned for another reason: adapters `implements` and never `extends`, so the port never enters their prototype chain and that constructor never runs. It is dead code promising an initialisation nobody executes, and the doorway parameter properties come in through.
   - **Adapters `implements`, never `extends`.** `extends` would burn the single inheritance slot and demand an empty `super()` for nothing, and `useClass` works identically either way. `implements` is also the _only_ thing that checks conformity: `ClassProvider.provide` is typed `any`, so the module file verifies nothing.
@@ -187,6 +206,22 @@ src/modules/<context>/
 - **One use case per file, input included.** `application/use-cases/create-user.use-case.ts` holds `CreateUserUseCase` **and** its `export type CreateUserInput`. There is no `commands/`, no `queries/`, no `handlers/`: a command class whose only job was to carry three positionals into `execute()` bought a file, an import and a `new` per call site, and no invariant — the input is the use case's signature, not a reusable piece. Inputs are plain `type`s, **never** classes with `class-validator`: boundaries rule 2 bans that library from `application/`, and transport validation is the HTTP DTO's job. The controller calls `execute({ email: dto.email, … })`, which also kills the positional-argument bug class.
   - **The method stays `execute()`** — one public operation, same name in every use case.
   - **`users.facade.ts` stays loose in `application/`**, outside `use-cases/`: it is the context's public gate for other modules, not an intention of a user of the system. Its surface grows by method, not by file.
+- **Soft delete is opt-in, and `deleted_at` is not `active`.** `SoftDeletableEntity`
+  (`src/shared/domain/soft-deletable-entity.base.ts`) is a class an entity **chooses** to extend —
+  unlike bridge's `BaseEntity`, where `@DeleteDateColumn` lands on every table. Only `User` extends
+  it today, because `UsersProvisioning.deleteProfile` was the repo's only physical delete. The two
+  concepts are different and confusing them is the obvious trap: `active` is **business state**
+  (an inactive user exists, holds its email, is listed, can be reactivated — that's what
+  `DELETE /users/:id` does), while `deleted_at` is **lifecycle** (a deleted row doesn't exist for
+  the domain at all).
+  ⚠️ The unique email index is **partial** (`WHERE deleted_at IS NULL`) and that is load-bearing,
+  not tidiness: with the plain index a deleted profile would keep holding its email, and the
+  retry that the compensation exists to enable would get a 409 instead of a 201.
+  The column is plain `@Column`, never `@DeleteDateColumn`: that decorator brings
+  `softRemove()`/`restore()`, a second delete path that bypasses the aggregate. For the same
+  reason `UserRepository.delete()` is **gone** — the aggregate decides with `softDelete()` and the
+  repository just `save()`s. The three queries filter `deletedAt: IsNull()` explicitly, and the
+  in-memory fake filters too, or it would diverge from PostgreSQL.
 - **Validation** lives in HTTP DTOs, never in domain entities. The domain enforces invariants through constructors and value objects.
 - **Two models, never one.** The domain entity (`user.entity.ts`) is a plain class with invariants; the ORM entity (`user.orm-entity.ts`) carries the TypeORM decorators. A mapper is the only bridge. Don't decorate the domain entity with `@Entity` to save a file — that couples the domain to the database.
 - **Domain errors are not HTTP errors.** The domain throws `UserNotFoundError`; `infrastructure/http/user-domain-exception.filter.ts` decides it's a 404. Never import `HttpException` into `domain/` or `application/`.
@@ -198,7 +233,7 @@ src/modules/<context>/
 The split is what makes the two-context seam real: `users` owns the **profile** (identity, name, role, whether it is active), `auth` owns the **credential** and the token. The dependency runs `auth → users` and only that way — `auth` consumes `UsersLookup` and `UsersProvisioning` through `users.module.ts` like any other module. If `users` ever imported `auth.module` the repo would get its only possible module↔module cycle, which is exactly why `@Public`, `@Auth`, `@CurrentUser` and `AuthenticatedUser` stay in `common/`, where both can see them.
 
 - **Registration is `POST /auth/register`, not `POST /users`.** What is born in a sign-up is an **account** — profile _and_ credential — so the endpoint belongs to the context that owns the credential. `POST /users` no longer exists; `CreateUserUseCase` survives with `{ email, name }` and its only consumer is the facade.
-- **Two writes, no distributed transaction: compensation.** `RegisterAccountUseCase` hashes the password, creates the profile through `UsersProvisioning`, then writes the credential. If the credential write fails it deletes **both** rows — `deleteProfile` first, then `credentials.deleteByUserId` — and re-throws. The profile goes first because it is the priority guarantee: an orphan profile could never log in _and_ would block its own email through the unique index, while an orphan credential is silent garbage that collides with nothing. Deleting the credential too is backlog #14: before cycle 4 the hash was a column of `users` and left with the row; with a separate table and **zero foreign keys in the whole schema** (not reintroduced on purpose — the two contexts may stop sharing a database), a credential whose INSERT committed while the response was lost stayed forever. That path needs a commit the caller never sees, so **no E2E can reach it** without an out-of-band commit (`dblink`): a `RAISE` in any trigger aborts the transaction and takes the row with it. It is covered by R10 in `register-account.use-case.spec.ts` with the fake, which can separate "wrote" from "answered". `auth.e2e-spec.ts` still forces the second write to fail with a `BEFORE INSERT` trigger that raises, and asserts both tables end empty.
+- **Two writes, no distributed transaction: compensation.** `RegisterAccountUseCase` hashes the password, creates the profile through `UsersProvisioning`, then writes the credential. If the credential write fails it deletes **both** rows — `deleteProfile` first, then `credentials.deleteByUserId` — and re-throws. The profile goes first because it is the priority guarantee: an orphan profile could never log in _and_ would block its own email through the unique index, while an orphan credential is silent garbage that collides with nothing. Deleting the credential too is backlog #14: before cycle 4 the hash was a column of `users` and left with the row; with a separate table and **zero foreign keys in the whole schema** (not reintroduced on purpose — the two contexts may stop sharing a database), a credential whose INSERT committed while the response was lost stayed forever. That path needs a commit the caller never sees, so **no E2E can reach it** without an out-of-band commit (`dblink`): a `RAISE` in any trigger aborts the transaction and takes the row with it. It is covered by R10 in `register-account.use-case.spec.ts` with the fake, which can separate "wrote" from "answered". `auth.e2e-spec.ts` still forces the second write to fail with a `BEFORE INSERT` trigger that raises, and asserts no **reachable** account is left. Since 2026-08-25 the profile half is a **logical** delete (see Soft delete below), so `users` keeps one marked row while `auth_credentials` ends empty.
 - **`POST /auth/register` reveals whether an email is taken — and that is a written decision** (backlog #15, closed 2026-08-08). The 409 **stays**: without it whoever already has an account cannot tell why the sign-up fails. What was closed is the **timing** leak, which was indefensible because it betrayed the account even to a client ignoring the status code. The password is now hashed **before** the uniqueness check, so both paths pay argon2id: measured over HTTP against real PostgreSQL, 409 vs 201 medians went from 7.52 ms / 91.47 ms (disjoint ranges, 12.2×) to 79.61 ms / 90.82 ms (overlapping, 1.14×). The residual ~11 ms is the extra INSERTs of the success path, not the hash. Row R11 pins it structurally — `hash()` exactly once on both paths — the same way L9 pins `verify()` for login, and the two comments reference each other.
 - **The provisioning gate returns results, never exceptions, for business rejections.** `createProfile` answers `{ ok: false, reason: 'email-taken' | 'invalid-profile' }` because `auth` cannot import `users`' error classes. `invalid-profile` carries the domain message: `@IsEmail` accepts strings `Email.from()` rejects, and `@MinLength(2)` measures the untrimmed name — without that branch those inputs, a 400 today, would have become a 500 the moment the sign-up left `users`.
 - **Global guard, secure by default.** `JwtAuthGuard` (`src/modules/auth/infrastructure/http/jwt-auth.guard.ts`) is registered as `APP_GUARD` from `auth.module`, not `app.module`: boundaries rule 3 forbids the app root from importing a module's internals, and `APP_GUARD` is a multi-provider — registering it from any module makes it global. A new endpoint without `@Public()` requires a valid JWT with no action from its author.
@@ -225,7 +260,7 @@ cannot:
   re-export publishes token and type at once. There are **two** such gates since backlog #13:
   `UsersLookup` (`userExists`, `findByEmail`) and `UsersProvisioning` (`createProfile`,
   `deleteProfile`), one `UsersFacadeImpl` behind both via `useExisting`. The single four-method
-  `UsersFacade` handed `orders` a physical `DELETE` it never asked for, over a schema with zero
+  `UsersFacade` handed `orders` a `DELETE` it never asked for, over a schema with zero
   foreign keys. The boundaries matrix cannot see that — it reasons by path, and this import is
   exactly the one amendment G2 legalised — so the type is the only control that does, and it
   does it at compile time: `orders` cannot write `deleteProfile` because what it injects does
@@ -280,7 +315,7 @@ defect as an undeclared one: _the published contract describes something the ser
   the status, which is where every divergence appeared during the migration: the published
   examples claimed `UserNotFoundError` while the server sends `Not Found`.
 
-### Three checks, and none replaces another
+### Four checks, and none replaces another
 
 Verified by measurement — deleting one because "another covers it" leaves a hole:
 
@@ -290,6 +325,18 @@ Verified by measurement — deleting one because "another covers it" leaves a ho
    `AllExceptionsFilter`. This is what would catch the factory being wrong.
 3. **example ↔ schema** (Ajv, in the contract guard) is the only one that would have caught the
    `array of arrays` that made `GET /users` unsatisfiable.
+4. **real response ↔ schema** (`openapi-runtime-contract.e2e-spec.ts`, added 2026-08-25) is the
+   only one that lands an actual HTTP request. The other three reason about the **document**: an
+   example can satisfy the schema perfectly while the server returns something else, because the
+   example is a hand-written literal and the response is built by the DTO, the envelope
+   interceptor and the serializer. Nothing tied them together. Verified by deleting one line of
+   `UserResponseDto.fromDomain` — it goes red with `must have required property 'role'` and the
+   exact `schemaPath`.
+   ⚠️ Its script of scenarios is hand-written (each operation needs its own setup: an admin, a
+   user to deactivate, an email that already exists), so there is a case asserting **the script
+   covers every operation the document publishes**. Without it a new endpoint would slip in with
+   nobody validating its response and the suite would stay green — which is how a guard stops
+   guarding without anyone noticing. Adding an endpoint costs adding its scenario, on purpose.
 
 ### Maintaining the Scalar bundle
 
@@ -315,6 +362,25 @@ In the console look for `Refused to` (how Chrome prefixes CSP violations); in th
 filter to anything that is **not** localhost. Do not add `'wasm-unsafe-eval'` pre-emptively —
 only if step 4 actually breaks.
 
+## Observability: the APM seam exists, the provider doesn't
+
+`ErrorReporter` (`src/common/observability/error-reporter.ts`) is an outbound port that
+`AllExceptionsFilter` calls for **5xx only** — a 404 is the server working, and sending those
+would drown real incidents in noise. The default adapter, `NoopErrorReporter`, does nothing and
+deliberately doesn't log: the filter already wrote that error with the same `requestId` a line
+earlier, so a logging adapter would duplicate every incident.
+
+Enchufar Sentry is one line in `app.module.ts` plus a five-line adapter — the JSDoc has it. What
+this repo does **not** do is what `bridge-fital-pti-api` does: decorate the filter with
+`@SentryExceptionCaptured()`, which ties the filter to one provider and puts `@sentry/nestjs` in
+the tree of everyone who uses the template. An APM ships data off the process; that is the
+deployer's decision, not the template's.
+
+⚠️ **The reporting call is wrapped in `try/catch` and that is load-bearing**, not defensive
+habit: without it an adapter that throws (APM down, bad key) takes down the `reply()` that comes
+after it, and the client gets no response at all because of the system that only watches. Verified
+by removing the `try/catch` — exactly one case goes red.
+
 ## Database
 
 PostgreSQL through TypeORM. Config lives in `src/config/database.config.ts`, wiring in `src/database/`.
@@ -322,6 +388,22 @@ PostgreSQL through TypeORM. Config lives in `src/config/database.config.ts`, wir
 - **`synchronize` is resolved in code, not taken from the env.** `DB_SYNCHRONIZE` can only ever turn it _off_; turning it _on_ also requires `NODE_ENV=development`. Outside development it is forced to `false` regardless of the `.env`, because `synchronize` can drop columns and data. See `resolveSynchronize()`.
 - **Schema changes go through migrations.** `pnpm migration:generate src/database/migrations/<Name>` after changing an ORM entity, then `pnpm migration:run`. In production `DB_MIGRATIONS_RUN=true` applies them on boot — read the next section before writing one that **drops or renames** anything.
 - **ORM entities are discovered by glob** (`*.orm-entity.ts` anywhere under `src/modules/`), so a new module registers itself with no central list to edit.
+- **Columns are snake_case automatically — don't write `name:`.** `SnakeNamingStrategy`
+  (`src/database/snake-naming.strategy.ts`, ~40 lines extending TypeORM's own
+  `DefaultNamingStrategy`, **no new dependency**) is registered in `buildTypeOrmOptions`, the one
+  place the TypeORM CLI and the Nest runtime share — registering it in only one would make them
+  diverge, and the one that diverged would generate phantom migrations against the other's schema.
+  It overrides exactly two methods, `tableName` and `columnName`; indexes and foreign keys keep
+  the default behaviour. An explicit `name:` still wins and is **not** converted, which is the
+  escape hatch for a legacy column — and what made adoption free (verified with
+  `migration:generate` before and after removing the 20 redundant `name:` that were left).
+  ⚠️ **`@Entity({ name })` is still mandatory**: without it `UserOrmEntity` becomes
+  `user_orm_entity` — the strategy can't know `OrmEntity` is our own decoration.
+  Two tests guard this and **neither replaces the other**, measured: `schema-conventions.e2e-spec.ts`
+  reads `information_schema` and catches a schema that already has camelCase (verified by injecting
+  `ADD COLUMN "testCamelCase"` — it goes red and names the column), but removing the strategy
+  doesn't turn it red because no existing column changes; the unit case in `typeorm-options.spec.ts`
+  catches that. One guards the cause, the other the effect.
 - **TLS:** `DB_SSL=false` locally, `true` against RDS. `DB_SSL_REJECT_UNAUTHORIZED=false` encrypts but does **not** verify the server's identity — prefer pointing `DB_SSL_CA` at the AWS bundle.
 - **Driver errors are translated in the adapter.** `UserTypeOrmRepository.save()` turns PostgreSQL's `23505` into `EmailAlreadyTakenError`, so a concurrent insert surfaces as 409 and not 500. The handler's pre-check is a nicety, not the defence.
 
@@ -330,6 +412,54 @@ PostgreSQL through TypeORM. Config lives in `src/config/database.config.ts`, wir
 **Any migration that drops or renames a column or a table is split in two — expand and
 contract — with the code deploy in between. Never in the same release.** Additive migrations
 (`CREATE TABLE`, `ADD COLUMN`) need none of this: old code ignores what it doesn't know.
+
+**⚠️ Excepción a la frase anterior, y es la que muerde: una columna nueva sin `DEFAULT` solo
+puede nacer `NOT NULL` si NINGUNA versión desplegada inserta en esa tabla sin nombrarla.**
+«Aditiva ⇒ no necesita expand/contract» es cierto para las **lecturas** y para columnas nullable
+o con `DEFAULT`; deja de serlo en cuanto la misma migración endurece a `NOT NULL`, porque
+entonces el problema se muda del `SELECT` al `INSERT`, y el código viejo no ignora una columna
+que el motor le exige nombrar. Medido al dar a `orders` sus `created_at` / `updated_at`, contra
+la base real ya migrada:
+
+```
+INSERT INTO orders (id, customer_id, concept, amount_cents, placed_at) VALUES (...);
+-- ERROR: null value in column "created_at" of relation "orders" violates not-null constraint
+```
+
+Ese `INSERT` de cinco columnas no es hipotético: es exactamente el que emite TypeORM con la
+entidad anterior, porque enumera solo las columnas que la entidad mapea (mismo hecho que el
+`SELECT` del final de esta sección, visto desde el otro lado). Con `DB_MIGRATIONS_RUN=true` la
+migración corre al arrancar el primer pod nuevo y, desde ese instante, las réplicas viejas dejan
+de poder escribir en esa tabla: `POST /orders` responde 500 hasta que acabe el rodado.
+
+Es el caso **simétrico** del `DROP NOT NULL` del expand que se explica más abajo — allí una
+columna que el código NUEVO deja de escribir tiene que perder su `NOT NULL`; aquí una columna
+que el código VIEJO todavía no escribe no puede nacer con él. Tres salidas, por este orden:
+
+1. **Nacer con `DEFAULT`** — la más barata. ⚠️ **Salvo para marcas de tiempo**, donde `DEFAULT
+now()` mete un segundo reloj en el sistema: aquí el instante lo pone el dominio con el `now`
+   que le inyecta el caso de uso, y por eso `orders` no lo usa (ver el JSDoc de
+   `1786076763455-create-orders-and-outbox.ts` y el de `order.orm-entity.ts`).
+2. **Nacer nullable**, y endurecerla más tarde si de verdad hace falta.
+3. **Partir en expand + contract**: expand añade la columna nullable y rellena las filas
+   existentes; contract hace el `SET NOT NULL` **precedido de un relleno
+   `WHERE … IS NULL`** para las filas que las réplicas viejas insertaron durante la ventana —
+   sin ese segundo relleno, el contract falla en producción.
+
+⚠️ **De dónde sale el relleno importa tanto como el relleno.** Se copia de una columna que ya
+tiene el dato correcto, nunca de `now()`: rellenar con la hora de la migración escribe un dato
+falso en todas las filas históricas. El ejemplo que dio origen a esta regla —`orders` recibiendo
+sus marcas de tiempo con el relleno saliendo de `placed_at`, porque para una orden ya existente el
+momento de creación **es** el de colocación— **ya no está en el árbol**: se ejecutó, se descubrió
+que su `NOT NULL` no era survivable, se partió en expand/contract y finalmente se colapsó dentro de
+`1786076763455-create-orders-and-outbox.ts` al no haber datos ni despliegue. La regla sobrevive al
+ejemplo; el episodio completo está en la cabecera de esa migración.
+
+El ejemplo trabajado que **sí** sigue en el árbol es el par
+`move-credentials-to-auth-{expand,contract}`, más abajo en esta misma sección.
+
+Si ninguna versión desplegada inserta sin nombrar la columna —una tabla que nace en esa misma
+migración, por ejemplo— el `NOT NULL` va en el `CREATE TABLE` y no hay nada que partir.
 
 | Step         | Contains                                                                                                          | Safe while old replicas serve traffic |
 | ------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
@@ -395,6 +525,41 @@ Related: Zod's `.default()` only fires on `undefined`, so a variable that is pre
 
 ## Code conventions
 
+- **Un comentario que afirma un hecho comprobable lleva la medición al lado, o no se escribe.**
+  Vale para «no compila», «está prohibido por el gate», «se repite N veces», «ningún test lo
+  detecta», «es seguro en un despliegue rodante». Todas esas frases se verifican con una línea de
+  shell, un `tsc` o rompiendo el código a propósito — y el comentario debe decir **cómo** se
+  verificó, no solo afirmar. La forma que ya usa el repo es «medido, no supuesto», seguida del
+  dato.
+
+  No es celo: **en el ciclo del 2026-08-22 se detectaron NUEVE afirmaciones falsas** en
+  comentarios, todas escritas con la misma seguridad que las ciertas. Decían, entre otras cosas,
+  que el gate de fronteras alcanzaba a los tests (no lo hace, `boundaries/ignore` los excluye),
+  que TypeScript prohíbe sentencias antes de `super()` (no las prohíbe, solo tocar `this`), que
+  un test de ida y vuelta no cubría dos columnas (cubría), que un literal se repetía 18 veces (se
+  repetía 8), y que una migración aditiva era segura en rodado (no lo era, y ese fue el defecto
+  más caro del ciclo). Las nueve las cazó una revisión que fue a comprobar; ninguna la habría
+  cazado un gate.
+
+  Un comentario equivocado es peor que ninguno: el siguiente que lo lea tomará una decisión
+  apoyándose en él. Si no lo mediste, escribe que no lo mediste — es una frase perfectamente
+  aceptable y el repo la usa.
+
+- **Un buen comentario nombra el FALLO que el código evita, no lo que el código hace.** Lo que
+  hace ya se lee en el código; lo que no se lee es qué pasaría sin él. Es la diferencia entre un
+  comentario que alguien borra en el próximo refactor y uno que le hace parar.
+
+  El mejor ejemplo que encontramos no es de este repo sino de `bridge-fital-pti-api`
+  (`user-sync.service.ts`), y por eso está citado aquí:
+
+  > `// INTENTIONAL: the JWT role is NEVER synced onto an existing user. Elevated roles are`
+  > `// managed manually in the database only; Auth0 always emits 'user', so syncing here would`
+  > `// silently degrade any elevated role on every login.`
+
+  No dice «no sincronizamos el rol». Dice **qué se rompería si lo hicieras** — y por eso nadie va
+  a «arreglar» esa omisión. Un comentario así vale por un test que no existe. Cuando el fallo SÍ
+  es testeable, se escriben las dos cosas: el caso y la línea que dice qué caza.
+
 - **Code in English, prose in Spanish.** Identifiers, object keys, file and folder names, env variables, config keys, SQL columns, `operationId` and form ids are English; comments, documentation, OpenAPI `summary`/`description`, ESLint rule messages and operator-facing messages are Spanish. `src/__tests__/language-convention.spec.ts` enforces it by asserting on **identifiers, never on strings** — which is why the Spanish `it` titles need no exemption. One written exception: the error messages in `env.schema.ts` and `validate-env.ts` are English because they share a string with Zod's untranslatable defaults.
 - **`type`, never `interface`.** ESLint enforces `@typescript-eslint/consistent-type-definitions: ['error', 'type']`. Skill reference files use `interface` as language-agnostic pseudocode — translate it before writing real code. Ports are the one place that is neither: they're `abstract class`, because they must survive compilation to act as their own DI token (see Architecture rules).
 - **Path aliases:** `@/` → `src/`, plus `@common/`, `@config/`, `@database/`, `@modules/`, `@shared/`, and `@test/` → `test/`. Shared test helpers are imported via `@test/`, not `@/`. Declared in three places that must stay in sync: `tsconfig.json`, `.swcrc` and `jest.config.mjs` — `test/jest-e2e.config.mjs` inherits from the latter instead of keeping its own copy.
@@ -407,7 +572,8 @@ Related: Zod's `.default()` only fires on `undefined`, so a variable that is pre
 - **Tests live in a `__tests__/` folder at the root of each module**, replicating the module's internal structure, so moving a module moves its tests with it. Unit specs are `*.spec.ts`, E2E are `*.e2e-spec.ts`, and both ship inside the module. Only shared helpers live outside `src/`, in `test/helpers/` (imported via `@test/`).
 - **`describe` in code, `it` in Spanish.** The root `describe` keeps the real identifier; nested `describe`s group cases and are Spanish, like every `it` — a Spanish sentence starting with `debería…`. Code, variables and helpers stay in English. AAA comments (`// Arrange`, `// Act`, `// Assert`) are mandatory.
 - **One spec per source file (1:1)**, same base name and same relative path inside `__tests__/`. Don't group several SUTs in one file.
-- **Mocking by layer:** no mocks in `domain/`; hand-written port fakes in `application/` (see `__tests__/helpers/in-memory-user.repository.ts`), never `jest.mock`; repositories are tested against real PostgreSQL in the E2E suite. Modules, TypeORM repositories, `data-source.ts`, seeds, the outbox CLI and migrations are excluded from _unit_ coverage on purpose, and `test/jest-e2e.config.mjs` measures them with its own threshold — **except `src/database/migrations/**`, which no suite measures**. That exception is deliberate and now written down: they are one-shot DDL run by the CLI, and the fact that nothing exercises them directly is open debt with its own entry (`docs/backlog.md` #17), not something the E2E config quietly covers. Until 2026-08-19 this sentence claimed the E2E suite measured "exactly those files" while its list held two of the six patterns, so four groups were measured by neither.
+- **Mocking by layer:** no mocks in `domain/`; hand-written port fakes in `application/` (see `__tests__/helpers/in-memory-user.repository.ts`), never `jest.mock`; repositories are tested against real PostgreSQL in the E2E suite. Modules, TypeORM repositories, `data-source.ts`, seeds, the outbox CLI and migrations are excluded from _unit_ coverage on purpose, and `test/jest-e2e.config.mjs` measures them with its own threshold. **Migrations joined that list on 2026-08-25** with `migrations.e2e-spec.ts`, which runs them up → down → up over a throwaway database with rows inside — closing backlog #2, where the exemption had been written down as open debt.
+  ⚠️ **A total revert cannot detect an incomplete `down()`.** Measured by removing a `DROP COLUMN` on purpose: only one of the five cases went red, the one that rewinds to a MIDDLE point. The other four revert everything, and `DROP TABLE users` takes the orphaned column with it — the defect erases itself before anyone looks. A partial revert is also the only kind that happens in production: nobody reverts seven migrations, you revert the last one.
 - **Shared fixtures:** module-wide helpers go in `<module>/__tests__/helpers/` (e.g. `user.factory.ts`, `arbitraries.ts`); cross-cutting ones in `test/helpers/` (e.g. `config.factory.ts`), imported via `@test/`. Never copy a builder into several specs.
 - **Property-based testing with `fast-check`** for value objects, pure functions and mapping round-trips. Arbitraries are **constructed**, never `.filter()`-ed out of `fc.string()`.
 - **The E2E suite runs against `crypto_amazon_clon_api_test`**, not the dev database — `test/setup-env.ts` forces `NODE_ENV=test` and the database name before the `AppModule` boots. The `TRUNCATE` in each `beforeEach` is required for the suite to be repeatable.

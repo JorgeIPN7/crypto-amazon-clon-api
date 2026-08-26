@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
-import { UsersLookup } from '../../users/users.module';
+import { UsersLookup } from '../../../users/users.module';
 
-import { CustomerDirectory } from '../domain/ports/customer.directory';
+import { CustomerDirectory } from '../../domain/ports/customer.directory';
 
 /**
  * Anti-corruption layer mínimo: implementa el puerto que `orders` definió inyectando la
@@ -19,6 +19,13 @@ import { CustomerDirectory } from '../domain/ports/customer.directory';
  * `UsersLookup` es a la vez el tipo del contrato y el token: sin `@Inject`, la referencia
  * a la clase viaja en `design:paramtypes` y Nest la resuelve contra el provider que
  * `users.module.ts` exporta.
+ *
+ * **Vive en `infrastructure/gateways/`**, no suelto en `infrastructure/` como hasta el
+ * 2026-08-25. Los demás adaptadores del repo cuelgan siempre de una subcarpeta que dice CON QUÉ
+ * hablan (`http/`, `persistence/`, `security/`); estos dos eran los únicos a pelo, y quedaban
+ * mezclados con las carpetas en el listado del módulo. `gateways/` es el sitio de un adaptador
+ * que habla con OTRO CONTEXTO o con un sistema externo — que es lo que distingue a un
+ * anti-corruption layer de un repositorio.
  */
 @Injectable()
 export class UsersCustomerDirectory implements CustomerDirectory {

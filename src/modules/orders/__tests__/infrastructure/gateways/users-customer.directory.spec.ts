@@ -1,5 +1,5 @@
-import type { UsersLookup } from '../../../users/users.module';
-import { UsersCustomerDirectory } from '../../infrastructure/users-customer.directory';
+import type { UsersLookup } from '../../../../users/users.module';
+import { UsersCustomerDirectory } from '../../../infrastructure/gateways/users-customer.directory';
 
 const KNOWN_ID = '9d2a1c7e-1f6b-4a2e-9c3d-77a1b0e5f012';
 

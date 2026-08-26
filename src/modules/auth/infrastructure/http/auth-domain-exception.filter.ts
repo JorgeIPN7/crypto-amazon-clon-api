@@ -1,11 +1,14 @@
 import {
-  BadRequestException,
   Catch,
   ConflictException,
   InternalServerErrorException,
   UnauthorizedException,
-  type ExceptionFilter,
 } from '@nestjs/common';
+
+import {
+  DomainExceptionFilter,
+  type DomainErrorMapping,
+} from '@common/http/domain-exception.filter';
 
 import {
   AuthDomainError,
@@ -15,9 +18,10 @@ import {
 } from '../../domain/errors/auth.errors';
 
 /**
- * Traduce los errores del dominio de `auth` al protocolo HTTP. Vive en `infrastructure/http/`
- * justamente para que el dominio no tenga que saber qué es un 401: el dominio lanza
- * `InvalidCredentialsError` y es el adaptador quien decide el código de estado.
+ * Traduce los errores del dominio de `auth` al protocolo HTTP, patrón del filtro de users.
+ * Vive en `infrastructure/http/` justamente para que el dominio no tenga que saber qué es un
+ * 401: el dominio lanza `InvalidCredentialsError` y es el adaptador quien decide el código de
+ * estado. El recorrido del mapa lo pone `DomainExceptionFilter`; aquí solo la tabla.
  *
  * **Todas las excepciones se construyen con un STRING**, nunca con un objeto (lección del
  * ciclo de auth original, hoy fijada además en `error-example.factory.spec.ts`): así Nest
@@ -31,32 +35,29 @@ import {
  * enumerar nada: es el MISMO mensaje para email inexistente, cuenta sin credencial, password
  * incorrecto y usuario inactivo.
  *
- * El catch es ancho (`AuthDomainError`) y no solo los casos mapeados: un error de dominio
- * nuevo sin mapeo explícito se trata como entrada inválida antes que como fallo del servidor
- * —el cliente pidió algo que el dominio rechaza—, que es donde cae hoy `InvalidProfileError`.
+ * El `@Catch` es ancho (`AuthDomainError`) y no solo los casos mapeados: un error de dominio
+ * nuevo sin mapeo explícito cae en el fallback 400 de la base y se trata como entrada
+ * inválida antes que como fallo del servidor —el cliente pidió algo que el dominio rechaza—,
+ * que es donde caen hoy `InvalidProfileError` e `InvalidCredentialIdError`. Para los dos es
+ * la traducción correcta y por eso no tienen entrada propia.
  *
- * `InvalidPasswordHashError` es la EXCEPCIÓN a ese fallback y por eso está mapeado aparte: no
- * describe una entrada del usuario, describe una fila corrupta. Ver su bloque más abajo.
+ * `InvalidPasswordHashError` es el único error mapeado de los tres contextos que NO se traduce
+ * como un 4xx de entrada del cliente, y por eso está aparte. Ver su bloque más abajo.
  */
 @Catch(AuthDomainError)
-export class AuthDomainExceptionFilter implements ExceptionFilter {
-  catch(exception: AuthDomainError): never {
-    if (exception instanceof InvalidCredentialsError) {
-      throw new UnauthorizedException(exception.message);
-    }
-
-    if (exception instanceof EmailAlreadyRegisteredError) {
-      throw new ConflictException(exception.message);
-    }
-
+export class AuthDomainExceptionFilter extends DomainExceptionFilter<AuthDomainError> {
+  protected readonly mappings: DomainErrorMapping<AuthDomainError> = [
+    [InvalidCredentialsError, (error) => new UnauthorizedException(error.message)],
+    [EmailAlreadyRegisteredError, (error) => new ConflictException(error.message)],
     /**
      * 500 y no 400, ni 401. `PasswordHash.from()` solo lanza esto al RECONSTITUIR una
      * credencial ya persistida (`credential.mapper.ts`); nada del body del cliente pasa por
      * ahí. Llegar aquí significa que la fila de `auth_credentials` no contiene un hash
      * argon2id — alcanzable de verdad: la migración copia el valor verbatim y no valida
-     * formato, así que basta una carga por SQL desde otro sistema. Es corrupción de datos del
-     * servidor, y el fallback de «error de dominio = entrada inválida» lo publicaba como
-     * `400 Value is not a valid argon2id hash`: un detalle del almacenamiento, en el cuerpo.
+     * formato, así que basta una carga por SQL desde otro sistema. No es entrada inválida del
+     * cliente sino CORRUPCIÓN de un dato ya persistido, y el fallback de «error de dominio =
+     * entrada inválida» lo publicaba como `400 Value is not a valid argon2id hash`: un detalle
+     * del almacenamiento, en el cuerpo.
      *
      * Descartado tratarlo como credenciales inválidas (401) pese a que uniformaría el login:
      * la propiedad anti-enumeración protege de los caminos que un ATACANTE puede provocar por
@@ -71,13 +72,13 @@ export class AuthDomainExceptionFilter implements ExceptionFilter {
      * entorno (la rama `isProductionLike` del filtro global solo sanea los `Error` no-HTTP, y
      * esto ya es una `HttpException`): va como `cause`, que solo ve el logger.
      */
-    if (exception instanceof InvalidPasswordHashError) {
-      throw new InternalServerErrorException('Internal server error', {
-        description: 'InternalServerError',
-        cause: exception,
-      });
-    }
-
-    throw new BadRequestException(exception.message);
-  }
+    [
+      InvalidPasswordHashError,
+      (error) =>
+        new InternalServerErrorException('Internal server error', {
+          description: 'InternalServerError',
+          cause: error,
+        }),
+    ],
+  ];
 }

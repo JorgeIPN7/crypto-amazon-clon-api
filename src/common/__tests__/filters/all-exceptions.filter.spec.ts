@@ -1,3 +1,4 @@
+import type { ErrorReporter } from '@common/observability/error-reporter';
 import {
   BadRequestException,
   HttpException,
@@ -262,6 +263,69 @@ describe('AllExceptionsFilter', () => {
     });
   });
 
+  describe('reporte al APM', () => {
+    it('debería reportar un 500 que no es HttpException', () => {
+      // Arrange
+      const { filter, errorReporter } = buildFilter();
+      const boom = new TypeError('algo se rompió');
+
+      // Act
+      filter.catch(boom, buildHost());
+
+      // Assert
+      expect(errorReporter.report).toHaveBeenCalledWith(boom, {
+        requestId: 'req-x',
+        path: '/api/v1/x',
+        statusCode: 500,
+      });
+    });
+
+    it('debería reportar también un 5xx que SÍ es HttpException', () => {
+      // Arrange
+      const { filter, errorReporter } = buildFilter();
+
+      // Act
+      filter.catch(new HttpException('Boom', 503), buildHost());
+
+      // Assert
+      // Un `InternalServerErrorException` lanzado a propósito —como el de
+      // `InvalidPasswordHashError`— sigue siendo algo que alguien tiene que mirar. Que el
+      // servidor supiera nombrar el fallo no lo convierte en normal.
+      expect(errorReporter.report).toHaveBeenCalledTimes(1);
+    });
+
+    it('debería no reportar un 4xx', () => {
+      // Arrange
+      const { filter, errorReporter } = buildFilter();
+
+      // Act
+      filter.catch(new HttpException('No encontrado', 404), buildHost());
+
+      // Assert
+      // Un 404 es el servidor funcionando. Mandarlo al APM ahogaría los incidentes reales entre
+      // ruido, que es la forma más común de que un APM deje de mirarse.
+      expect(errorReporter.report).not.toHaveBeenCalled();
+    });
+
+    it('debería responder al cliente aunque el reporte al APM lance', () => {
+      // Arrange
+      const { filter, reply, errorReporter, logger } = buildFilter();
+      (errorReporter.report as jest.Mock).mockImplementation(() => {
+        throw new Error('Sentry no responde');
+      });
+
+      // Act
+      filter.catch(new TypeError('algo se rompió'), buildHost());
+
+      // Assert
+      // Es lo que separa «observabilidad» de «punto único de fallo»: sin el try/catch, un APM
+      // caído tumbaría el `reply()` que viene después y el cliente se quedaría sin respuesta
+      // por culpa del sistema que solo mira.
+      expect(reply).toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalled();
+    });
+  });
+
   describe('extractDetails()', () => {
     it('debería exponer solo las claves permitidas del payload de la excepción', () => {
       // Arrange
@@ -332,7 +396,13 @@ const buildFilterFor = (isProductionLike: boolean) => {
   const config = {
     getOrThrow: () => ({ isProductionLike }),
   } as unknown as ConfigService;
-  return { filter: new AllExceptionsFilter(httpAdapterHost, logger, config), reply, logger };
+  const errorReporter = { report: jest.fn() } as unknown as ErrorReporter;
+  return {
+    filter: new AllExceptionsFilter(httpAdapterHost, logger, config, errorReporter),
+    reply,
+    logger,
+    errorReporter,
+  };
 };
 
 /** Filtro tal y como corre en desarrollo: el mensaje real del error llega al cliente. */

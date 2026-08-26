@@ -11,15 +11,15 @@ export class OutboxMessageOrmEntity {
   @PrimaryColumn({ type: 'uuid' })
   id!: string;
 
-  @Column({ name: 'event_type', type: 'varchar', length: 120 })
+  @Column({ type: 'varchar', length: 120 })
   eventType!: string;
 
   @Column({ type: 'jsonb' })
   payload!: Record<string, unknown>;
 
-  @Column({ name: 'occurred_at', type: 'timestamptz' })
+  @Column({ type: 'timestamptz' })
   occurredAt!: Date;
 
-  @Column({ name: 'processed_at', type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   processedAt!: Date | null;
 }

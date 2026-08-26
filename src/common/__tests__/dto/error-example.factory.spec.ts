@@ -1,3 +1,4 @@
+import { NoopErrorReporter } from '@common/observability/error-reporter';
 import {
   BadRequestException,
   ConflictException,
@@ -123,5 +124,10 @@ const buildFilter = (isProductionLike = false) => {
   } as unknown as PinoLogger;
   const config = { getOrThrow: () => ({ isProductionLike }) } as unknown as ConfigService;
 
-  return { filter: new AllExceptionsFilter(httpAdapterHost, logger, config), reply };
+  // El reporter real que no hace nada, no un doble: esta suite comprueba el CUERPO del error, y
+  // un `jest.fn()` aquí solo añadiría ruido a un punto que no está bajo prueba.
+  return {
+    filter: new AllExceptionsFilter(httpAdapterHost, logger, config, new NoopErrorReporter()),
+    reply,
+  };
 };

@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { USER_ROLES, type UserRole } from '../../../domain/value-objects/user-role';
+import { TIMESTAMP } from '@common/dto/error-example.factory';
+
+import { USER_ROLES, type UserRole } from '../../../domain/user-role';
 import type { User } from '../../../domain/entities/user.entity';
 
 export class UserResponseDto {
@@ -48,7 +50,7 @@ export class UserResponseDto {
    */
   @ApiProperty({
     description: 'Alta, en UTC.',
-    example: '2026-08-01T10:15:00.000Z',
+    example: TIMESTAMP,
     type: String,
     format: 'date-time',
   })
@@ -56,7 +58,7 @@ export class UserResponseDto {
 
   @ApiProperty({
     description: 'Última modificación, en UTC.',
-    example: '2026-08-01T10:15:00.000Z',
+    example: TIMESTAMP,
     type: String,
     format: 'date-time',
   })

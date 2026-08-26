@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { TIMESTAMP } from '@common/dto/error-example.factory';
+
 // Misma excepción legítima al blindaje de `ports/` que `jwt-auth.guard.ts`: de este archivo
 // no se consume el PUERTO (`UserDirectory`, que un DTO jamás inyecta) sino el `type` de datos
 // que lo acompaña. No hay referencia que borrar del emit, así que `import type` es correcto
@@ -58,7 +60,7 @@ export class AuthenticatedUserDto {
 
   @ApiProperty({
     description: 'Alta, en UTC.',
-    example: '2026-08-01T10:15:00.000Z',
+    example: TIMESTAMP,
     type: String,
     format: 'date-time',
   })
@@ -66,7 +68,7 @@ export class AuthenticatedUserDto {
 
   @ApiProperty({
     description: 'Última modificación, en UTC.',
-    example: '2026-08-01T10:15:00.000Z',
+    example: TIMESTAMP,
     type: String,
     format: 'date-time',
   })

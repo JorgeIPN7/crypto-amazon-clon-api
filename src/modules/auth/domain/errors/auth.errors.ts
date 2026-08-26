@@ -1,19 +1,15 @@
+import { DomainError } from '@shared/domain/domain-error.base';
+
 /**
- * Errores de dominio de `auth`: de negocio, no de transporte. No heredan de `HttpException`
- * ni conocen códigos HTTP — traducirlos es tarea de
+ * Errores de dominio de `auth`: de negocio, no de transporte. Traducirlos es tarea de
  * `infrastructure/http/auth-domain-exception.filter.ts`. Mismo contrato que `user.errors.ts`
- * y `order.errors.ts`.
+ * y `order.errors.ts` — el cuerpo compartido está en `DomainError`.
  *
  * `InvalidCredentialsError` e `InvalidPasswordHashError` VIVÍAN en `users`: se mudaron aquí
  * con la credencial. `users` ya no sabe qué es una contraseña, así que tampoco puede tener
  * los errores que hablan de ella.
  */
-export abstract class AuthDomainError extends Error {
-  protected constructor(message: string) {
-    super(message);
-    this.name = new.target.name;
-  }
-}
+export abstract class AuthDomainError extends DomainError {}
 
 export class InvalidCredentialsError extends AuthDomainError {
   constructor() {
@@ -53,5 +49,17 @@ export class EmailAlreadyRegisteredError extends AuthDomainError {
 export class InvalidProfileError extends AuthDomainError {
   constructor(message: string) {
     super(message);
+  }
+}
+
+/**
+ * El id de una credencial no tiene forma de UUID. A diferencia de los demás errores de este
+ * archivo, no lo puede provocar un cliente: la credencial acuña su id y la única otra vía es
+ * `CredentialMapper.toDomain`, es decir una fila manipulada a mano. Cae en el fallback 400
+ * del filtro sin rama propia, y eso es correcto: no hay contrato publicado que lo mencione.
+ */
+export class InvalidCredentialIdError extends AuthDomainError {
+  constructor(readonly value: string) {
+    super(`"${value}" is not a valid credential id`);
   }
 }

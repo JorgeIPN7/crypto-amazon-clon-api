@@ -1,6 +1,6 @@
 /**
  * El perfil tal y como `auth` necesita verlo. Es un tipo PROPIO de este contexto, no el
- * `UserSummary` de la fachada de users: el adaptador (`infrastructure/users-user.directory.ts`)
+ * `UserSummary` de la fachada de users: el adaptador (`infrastructure/gateways/users-user.directory.ts`)
  * traduce campo a campo, que es lo que convierte a ese adaptador en un anti-corruption layer
  * de verdad y no en un alias.
  */

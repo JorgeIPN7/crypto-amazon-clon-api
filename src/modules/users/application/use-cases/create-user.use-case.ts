@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import { SYSTEM_ACTORS } from '@shared/domain/system-actor';
+
 import { Email } from '../../domain/value-objects/email.vo';
 import { EmailAlreadyTakenError } from '../../domain/errors/user.errors';
 import { UserRepository } from '../../domain/ports/user.repository';
@@ -40,11 +42,21 @@ export class CreateUserUseCase {
       throw new EmailAlreadyTakenError(email.value);
     }
 
+    // El actor es el ORIGEN AUTOMÁTICO, con nombre y no `null`. El ÚNICO camino que llega aquí es
+    // `UsersFacadeImpl.createProfile`, que a su vez solo lo llama `RegisterAccountUseCase` desde
+    // `POST /auth/register`, que es `@Public()`: no hay token, no hay `sub`, no hay actor.
+    // Verificado buscando llamantes de `execute` y de `createProfile` en todo `src/`.
+    //
+    // Por eso `CreateUserInput` NO gana un campo `createdBy`: sería un parámetro que ningún
+    // llamante puede rellenar con algo distinto de `null`, y arrastrarlo obligaría a abrir
+    // también `UsersProvisioning.createProfile`, que es superficie PUBLICADA cross-módulo. Se
+    // abre el día que exista un alta autenticada (un admin creando cuentas), no antes.
     const user = User.create({
       id: UserId.generate(),
       email,
       name: input.name,
       now: new Date(),
+      createdBy: SYSTEM_ACTORS.PUBLIC_REGISTRATION,
     });
 
     await this.users.save(user);

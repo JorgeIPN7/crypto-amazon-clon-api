@@ -34,12 +34,18 @@ export class PlaceOrderUseCase {
       throw new CustomerGoneError(input.customerId);
     }
 
+    // `createdBy` sale del mismo `customerId` porque hoy el único camino es el cliente
+    // colocándose su propia orden (`POST /orders`, `@Auth()`, `sub` del token). Se escribe aquí
+    // y no dentro del agregado a propósito: quién es el actor lo sabe la aplicación, no el
+    // dominio, y el día que un admin coloque órdenes en nombre de otro esta línea es la que
+    // cambia — `PlaceOrderInput` ganará su propio campo y el agregado no se entera.
     const order = Order.place({
       id: OrderId.generate(),
       customerId: input.customerId,
       concept: OrderConcept.from(input.concept),
       amount: OrderAmount.from(input.amountCents),
       now: new Date(),
+      createdBy: input.customerId,
     });
 
     await this.orders.save(order, order.pullEvents());

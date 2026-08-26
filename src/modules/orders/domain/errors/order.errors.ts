@@ -1,14 +1,11 @@
+import { DomainError } from '@shared/domain/domain-error.base';
+
 /**
  * Errores de dominio de orders: de negocio, no de transporte. Traducirlos a HTTP es tarea
  * de `infrastructure/http/orders-domain-exception.filter.ts` — mismo contrato que
- * `user.errors.ts`.
+ * `user.errors.ts`. El cuerpo compartido está en `DomainError`.
  */
-export abstract class OrderDomainError extends Error {
-  protected constructor(message: string) {
-    super(message);
-    this.name = new.target.name;
-  }
-}
+export abstract class OrderDomainError extends DomainError {}
 
 export class InvalidOrderIdError extends OrderDomainError {
   constructor(readonly value: string) {

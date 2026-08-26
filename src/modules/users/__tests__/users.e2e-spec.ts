@@ -1,3 +1,5 @@
+import { SYSTEM_ACTORS } from '@shared/domain/system-actor';
+
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -249,6 +251,48 @@ describe('Users (e2e)', () => {
       expect(rows[0]?.active).toBe(false);
     });
 
+    /**
+     * La cadena COMPLETA del actor: token → `@CurrentUser()` → `DeactivateUserInput.by` →
+     * `User.deactivate` → `touch` → mapper → columna. Vive en el E2E porque es el único sitio
+     * donde el eslabón `@CurrentUser()` existe: un `createParamDecorator` solo se resuelve
+     * dentro del pipeline de Nest, así que `users.controller.spec.ts` —que construye el
+     * controller con `new`— no puede alcanzarlo.
+     *
+     * **No es simetría con el caso unitario, es un agujero medido.** Antes de añadirlo, cambiar
+     * `by: actor.sub` por `by: null` en el controller dejaba los 653 tests unitarios y los 134
+     * E2E en verde. Comprobado haciendo exactamente ese cambio y corriendo las dos suites.
+     *
+     * Se afirma contra la COLUMNA cruda y no contra la respuesta: `UserResponseDto` no publica
+     * la auditoría a propósito, así que el cuerpo del 200 no puede decir nada de esto.
+     */
+    it('debería anotar en la columna updatedBy el sub del admin que desactiva', async () => {
+      // Arrange
+      const created = await postRegister({
+        email: 'auditado@example.com',
+        name: 'Usuario Auditado',
+        password: DEFAULT_PASSWORD,
+      });
+      const id = created.body.data.user.id as string;
+
+      // Act
+      await request(app.getHttpServer())
+        .delete(`${prefix}/users/${id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      // Assert
+      const rows = await dataSource.query<
+        { created_by: string | null; updated_by: string | null }[]
+      >('SELECT "created_by", "updated_by" FROM users WHERE id = $1', [id]);
+      expect(rows[0]?.updated_by).toBe(subOf(adminToken));
+      // `created_by` conserva el origen del ALTA y no se sobrescribe al desactivar: quien creó la
+      // fila no deja de haberla creado porque otro la modifique después. Es el par que hace útil
+      // tener dos columnas en vez de una — y la única forma de verlo es una fila que ya pasó por
+      // las dos manos, que es exactamente el estado en el que está esta.
+      expect(rows[0]?.created_by).toBe(SYSTEM_ACTORS.PUBLIC_REGISTRATION);
+      expect(rows[0]?.created_by).not.toBe(rows[0]?.updated_by);
+    });
+
     it('debería responder 404 al desactivar un usuario inexistente', async () => {
       // Act
       const response = await request(app.getHttpServer())
@@ -408,5 +452,18 @@ describe('Users (e2e)', () => {
     // UPDATE directo y no un endpoint: promover no tiene (ni debe tener) ruta HTTP, y el
     // seed del primer admin es CLI. El E2E reproduce exactamente ese camino de operación.
     await source.query(`UPDATE users SET role = 'admin' WHERE email = $1`, [email]);
+  }
+
+  /**
+   * Lee el `sub` del JWT decodificando su payload, SIN verificar la firma — el token lo acaba
+   * de emitir esta misma app, así que verificarlo aquí probaría al firmador, no al actor. Se
+   * lee del token y no de la tabla a propósito: el `beforeEach` hace TRUNCATE de `users`, de
+   * modo que la fila del admin ya no existe cuando el caso corre; el JWT, en cambio, es
+   * stateless y sigue valiendo. Es también el único sitio donde se puede comprobar que el
+   * actor anotado es EXACTAMENTE el `sub` que viajó en la petición.
+   */
+  function subOf(token: string): string {
+    const payload = token.split('.')[1] ?? '';
+    return (JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8')) as { sub: string }).sub;
   }
 });

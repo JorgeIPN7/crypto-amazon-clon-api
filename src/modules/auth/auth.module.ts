@@ -20,7 +20,7 @@ import { CredentialOrmEntity } from './infrastructure/persistence/credential.orm
 import { CredentialTypeOrmRepository } from './infrastructure/persistence/credential.typeorm.repository';
 import { Argon2PasswordHasher } from './infrastructure/security/argon2-password-hasher';
 import { NestJwtTokenSigner } from './infrastructure/security/nest-jwt-token-signer';
-import { UsersUserDirectory } from './infrastructure/users-user.directory';
+import { UsersUserDirectory } from './infrastructure/gateways/users-user.directory';
 
 /**
  * Composition root del bounded context. `UsersModule` se importa por su module file —la única
