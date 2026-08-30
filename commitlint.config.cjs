@@ -72,6 +72,7 @@ module.exports = {
         'users',
         'auth',
         'orders',
+        'wallets',
         // Infraestructura y transversales
         'config',
         'database',
