@@ -1,0 +1,44 @@
+# Excepciones de gitleaks, una por LÍNEA y nunca por archivo ni por regla.
+#
+# Cada entrada silencia exactamente un hallazgo y ninguno más: si alguien añade un secreto de
+# verdad al mismo archivo, sigue saliendo rojo. Un `paths` o un `[[rules]] disabled` habrían
+# apagado el gate para todo el archivo, que es justo lo que no se quiere.
+#
+# ⚠️ Nada de lo listado aquí es un secreto. Todos son literales de EJEMPLO en un documento de
+# planificación, y disparan la regla `generic-api-key`, que combina una palabra clave —`TOKEN`,
+# `KEY`— con la entropía de Shannon del valor que la sigue. La regla no puede distinguir una
+# dirección Ethereum pública de una credencial, y en este repo ya cobró esa factura una vez: en el
+# ciclo de `wallets` marcó dos direcciones públicas de un spec y se arregló renombrando la
+# constante de `TOKEN` a `CONTRACT` — quitar la palabra clave, no la comprobación.
+#
+# Aquí no se puede hacer lo mismo: el archivo es un plan ya escrito y sus fragmentos de código
+# reproducen el nombre que la constante tiene en el spec real.
+#
+# Qué hay exactamente, comprobado literal por literal:
+#
+#   · `0x742d35cc…f44e` y `0x782919af…42ba` — direcciones de contrato ERC-20. Una dirección
+#     Ethereum es información PÚBLICA por construcción: se deriva de una clave pública y se
+#     publica en cada transacción. No hay nada que filtrar.
+#
+#   · `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` — la clave privada de
+#     la **cuenta #0 de Hardhat y Anvil**, publicada en la documentación de ambos y presente en
+#     millones de repositorios. Cualquier cadena local la financia con 10 000 ETH de juguete al
+#     arrancar; en una red real, cualquiera que quisiera vaciarla lo habría hecho hace años.
+#     Ponerla aquí es lo correcto precisamente porque NO es utilizable: usar una clave inventada
+#     de aspecto realista sería peor, porque podría colisionar con una cuenta de alguien.
+#
+# ⚠️ Lo que esta lista NO cubre, y conviene saberlo: el job de CI escanea un rango de commits en
+# `push` y `pull_request`, y el historial completo solo en el cron semanal. Un secreto que entre
+# hoy no lo caza el PR siguiente — por eso el criterio del repo es correr gitleaks a mano ANTES
+# del primer commit que toque `.env.example` o un archivo de configuración, y no confiarlo al PR.
+
+docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:2798
+docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:7692
+docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:9771
+docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:12671
+docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:13972
+docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:15050
+docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:15180
+docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:15395
+docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:17261
+docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:17272

@@ -1,10 +1,14 @@
+import { PRODUCTION_LIKE_ENV } from '@test/helpers/config.factory';
+
 import { appConfig } from '../app.config';
 import { authConfig } from '../auth.config';
+import { configurations } from '../configurations';
 import { corsConfig } from '../cors.config';
 import { logConfig } from '../log.config';
 import { docsConfig } from '../docs.config';
 import { throttlerConfig } from '../throttler.config';
 import { validateEnv } from '../validate-env';
+import { walletsConfig } from '../wallets.config';
 
 const ORIGINAL_ENV = process.env;
 
@@ -19,9 +23,10 @@ afterAll(() => {
 describe('appConfig', () => {
   it('debería derivar los flags de entorno a partir de NODE_ENV', () => {
     // Arrange
-    // JWT_SECRET es obligatorio en production por el refine de auth en env.schema.ts;
-    // no tiene relación con lo que este caso comprueba (los flags derivados de NODE_ENV).
-    withEnv({ NODE_ENV: 'production', JWT_SECRET: 'x'.repeat(32) });
+    // JWT_SECRET y las credenciales del proveedor son obligatorios en production por los refines
+    // de env.schema.ts; no tienen relación con lo que este caso comprueba (los flags derivados
+    // de NODE_ENV).
+    withEnv({ NODE_ENV: 'production', ...PRODUCTION_LIKE_ENV });
 
     // Act
     const config = appConfig();
@@ -223,6 +228,16 @@ describe('authConfig', () => {
     expect(config.jwtSecret).toContain('insecure-dev-secret');
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]?.[0])).toContain('JWT_SECRET no definido');
+  });
+});
+
+describe('configurations', () => {
+  it('debería registrar el namespace de wallets en la lista que carga ConfigModule', () => {
+    // Arrange + Act + Assert
+    // Sin esta línea el módulo `wallets` compila, arranca y falla en la primera petición con
+    // `Cannot read properties of undefined`: `ConfigModule.forRoot({ load })` es lo único que
+    // convierte el factory en un provider inyectable.
+    expect(configurations).toContain(walletsConfig);
   });
 });
 

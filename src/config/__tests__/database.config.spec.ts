@@ -1,3 +1,5 @@
+import { PRODUCTION_LIKE_ENV } from '@test/helpers/config.factory';
+
 import {
   buildDatabaseConfig,
   resolveMigrationsRun,
@@ -175,12 +177,13 @@ describe('buildDatabaseConfig', () => {
 
   it('debería aplicar la guarda de synchronize al construir la configuración', () => {
     // Arrange
-    // JWT_SECRET es obligatorio en production por el refine de auth en env.schema.ts;
-    // no tiene relación con lo que este caso comprueba (la guarda de synchronize).
+    // JWT_SECRET y las credenciales del proveedor son obligatorios en production por los refines
+    // de env.schema.ts; no tienen relación con lo que este caso comprueba (la guarda de
+    // synchronize).
     const env = buildEnv({
       NODE_ENV: 'production',
       DB_SYNCHRONIZE: 'true',
-      JWT_SECRET: 'x'.repeat(32),
+      ...PRODUCTION_LIKE_ENV,
     });
 
     // Act

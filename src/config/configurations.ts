@@ -5,6 +5,7 @@ import { databaseConfig, type DatabaseConfig } from './database.config';
 import { docsConfig, type DocsConfig } from './docs.config';
 import { logConfig, type LogConfig } from './log.config';
 import { throttlerConfig, type ThrottlerConfigValues } from './throttler.config';
+import { walletsConfig, type WalletsConfig } from './wallets.config';
 
 /** Los namespaces que `ConfigModule.forRoot({ load })` registra. Vivía en el barrel de config. */
 export const configurations = [
@@ -15,6 +16,7 @@ export const configurations = [
   throttlerConfig,
   docsConfig,
   authConfig,
+  walletsConfig,
 ];
 
 export type Configurations = {
@@ -25,4 +27,5 @@ export type Configurations = {
   throttler: ThrottlerConfigValues;
   docs: DocsConfig;
   auth: AuthConfig;
+  wallets: WalletsConfig;
 };
