@@ -4,7 +4,8 @@ import { InvalidAddressIndexError } from '../errors/wallet.errors';
 
 /**
  * El máximo de un `integer` de PostgreSQL, el tipo que tendrá la columna `address_index` cuando
- * la cree la migración del módulo (Task 30). Hoy esa columna todavía no existe en el árbol.
+ * la cree la migración del módulo. Hoy esa columna todavía no existe: medido con
+ * `find src/database/migrations -name '*wallet*'`, que no devuelve nada.
  *
  * **El fallo que evita:** aceptar uno más aquí no evitaría el error, lo MUDARÍA al `INSERT` —
  * donde ya no se distingue de un problema del driver y llega después de haber gastado los

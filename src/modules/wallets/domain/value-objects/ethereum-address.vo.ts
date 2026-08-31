@@ -33,7 +33,8 @@ const ETHEREUM_ADDRESS = /^0x[0-9a-f]{40}$/;
  * ⚠️ **No valida el checksum EIP-55, y es deliberado.** Lo que eso deja pasar tiene nombre: una
  * dirección MAL TECLEADA que el checksum habría cazado entra como válida, y una transferencia a
  * una dirección inexistente no se puede deshacer. Quien lo tapará es el validador del DTO
- * (Task 35), en `infrastructure/http/`, con keccak256 de `@noble/hashes`, y **solo cubrirá lo
+ * `is-checksummed-address.validator.ts`, en `infrastructure/http/`, con keccak256 de
+ * `@noble/hashes`, y **solo cubrirá lo
  * que entre por HTTP** — el otro origen de direcciones es el proveedor, que las devuelve en
  * minúsculas, es decir sin checksum que comprobar.
  *

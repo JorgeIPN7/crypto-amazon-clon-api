@@ -92,8 +92,9 @@ export class InvalidTransactionHashError extends WalletDomainError {
  * ⚠️ **Recibe el CAMPO primero y la CLASE después, y el mensaje los nombra al revés.** Los dos
  * parámetros son `string`, así que invertir la llamada compila y publica «Asset of kind "amount"
  * requires the field "fungible"» — literalmente al revés, y ningún tipo lo caza. El caso E8 lo
- * fija, y `TransferAsset.requiredField` (Task 8) será el único sitio del árbol que lo construya —
- * hoy, con `TransferAsset` aún sin escribir, solo lo construye este spec.
+ * fija, y `TransferAsset.requiredField` (`transfer-asset.ts:260`) es el único sitio de `src/`
+ * fuera de los tests que lo construye. La medición y el mutante que lo demuestran viven en el
+ * JSDoc de ese helper, que es donde la inversión puede colarse.
  */
 export class MissingAssetFieldError extends WalletDomainError {
   constructor(

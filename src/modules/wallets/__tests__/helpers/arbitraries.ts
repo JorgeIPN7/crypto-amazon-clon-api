@@ -4,6 +4,10 @@ import {
   PROVIDER_FAILURE_REASONS,
   type ProviderFailureReason,
 } from '../../domain/errors/wallet.errors';
+import { TransferAsset, type TransferAssetKind } from '../../domain/transfer-asset';
+import { EthereumAddress } from '../../domain/value-objects/ethereum-address.vo';
+import { TokenAmount } from '../../domain/value-objects/token-amount.vo';
+import { TokenId } from '../../domain/value-objects/token-id.vo';
 
 /**
  * Arbitrarios del módulo `wallets`. Todos están **construidos** — `fc.constantFrom`, `fc.array`
@@ -11,14 +15,17 @@ import {
  * prácticamente todo lo generado y fast-check acabaría abortando la propiedad por exceso de
  * descartes.
  *
- * Ninguno de los que nacen aquí importa un value object: todos producen cadenas y números sueltos,
- * y por eso el archivo puede nacer entero en la primera tarea del módulo sin arrastrar a ninguna
- * otra.
+ * Ninguno de los que abren el archivo importa un value object: producen cadenas y números sueltos,
+ * y por eso pudieron nacer todos con el módulo, sin arrastrar a ninguna otra pieza.
  *
- * ⚠️ Los dos arbitrarios que SÍ necesitan código de más adelante se añaden en la tarea que crea esa
- * dependencia: `transferAssetArb` en la Task 8 (construye `TransferAsset` y tres value objects) y
- * `pageArb` / `limitArb` en la Task 16. Adelantarlos aquí rompería la suite de esta misma tarea,
- * que importa este archivo, con `Cannot find module`.
+ * El último bloque, `transferAssetArb`, es el primero que rompe esa regla —construye
+ * `TransferAsset` y tres value objects— y por eso llegó después: escrito antes de que existiera
+ * `../../domain/transfer-asset`, habría tumbado con `Cannot find module` a `wallet.errors.spec.ts`,
+ * que importa este archivo desde el primer día del módulo.
+ *
+ * ⚠️ Todavía faltan por llegar `pageArb` / `limitArb`, que acompañarán al listado paginado
+ * (`list-wallet-transfers.use-case.spec.ts`, aún no en el árbol). Esos dos no dependen de nada:
+ * están pendientes por calendario, no por un `import`.
  */
 
 const HEX_DIGITS = '0123456789abcdefABCDEF';
@@ -91,3 +98,84 @@ export const tokenIdArb = fc.oneof(
 export const leadingZeroTokenIdArb = fc
   .tuple(fc.integer({ min: 1, max: 5 }), fc.integer({ min: 1, max: 9 }), digitsArb(0, 20))
   .map(([zeros, head, tail]) => `${'0'.repeat(zeros)}${head}${tail}`);
+
+/**
+ * Un activo de una de las cuatro clases, con el rastro de cómo se construyó: la clase con la que se
+ * pidió —el literal del vocabulario, o sea `'multi-token'` CON GUION— y los valores que lleva
+ * dentro, en el orden en que los recibe su factoría.
+ *
+ * `values` existe para que quien pruebe el mapper compare lo que copió contra lo que el activo
+ * lleva dentro **sin volver a leerlo del propio activo**: leerlo de ahí sería reimplementar el
+ * mapper dentro de su test, y un mapper que reformatease un valor seguiría verde.
+ *
+ * ⚠️ Los valores salen de `.value` del value object ya construido, **nunca de la cadena cruda que
+ * generó el arbitrario**. `EthereumAddress.from()` normaliza a minúsculas y `ethereumAddressArb`
+ * produce hexadecimal con las dos cajas mezcladas, así que con la cadena cruda la propiedad se
+ * pondría roja en cuanto el generador sacase una mayúscula, culpando al mapper de una normalización
+ * que hizo el dominio.
+ */
+export type TransferAssetSample = {
+  asset: TransferAsset;
+  kind: TransferAssetKind;
+  values: readonly string[];
+};
+
+const nativeAssetArb: fc.Arbitrary<TransferAssetSample> = tokenAmountArb.map((rawAmount) => {
+  const amount = TokenAmount.from(rawAmount);
+  return { asset: TransferAsset.native({ amount }), kind: 'native', values: [amount.value] };
+});
+
+const fungibleAssetArb: fc.Arbitrary<TransferAssetSample> = fc
+  .tuple(ethereumAddressArb, tokenAmountArb)
+  .map(([rawToken, rawAmount]) => {
+    const token = EthereumAddress.from(rawToken);
+    const amount = TokenAmount.from(rawAmount);
+    return {
+      asset: TransferAsset.fungible({ token, amount }),
+      kind: 'fungible',
+      values: [token.value, amount.value],
+    };
+  });
+
+const nftAssetArb: fc.Arbitrary<TransferAssetSample> = fc
+  .tuple(ethereumAddressArb, tokenIdArb)
+  .map(([rawToken, rawTokenId]) => {
+    const token = EthereumAddress.from(rawToken);
+    const tokenId = TokenId.from(rawTokenId);
+    return {
+      asset: TransferAsset.nft({ token, tokenId }),
+      kind: 'nft',
+      values: [token.value, tokenId.value],
+    };
+  });
+
+const multiTokenAssetArb: fc.Arbitrary<TransferAssetSample> = fc
+  .tuple(ethereumAddressArb, tokenAmountArb, tokenIdArb)
+  .map(([rawToken, rawAmount, rawTokenId]) => {
+    const token = EthereumAddress.from(rawToken);
+    const amount = TokenAmount.from(rawAmount);
+    const tokenId = TokenId.from(rawTokenId);
+    return {
+      asset: TransferAsset.multiToken({ token, amount, tokenId }),
+      kind: 'multi-token',
+      values: [token.value, amount.value, tokenId.value],
+    };
+  });
+
+/**
+ * Las cuatro clases, cada una construida por su factoría y compuesta a partir de los arbitrarios de
+ * dirección, importe e id que ya viven arriba en este mismo archivo. Reutilizarlos es lo que hace
+ * que endurecer un value object llegue solo a estas propiedades: un `TokenAmount` más estricto
+ * cambia `tokenAmountArb` y con él las cuatro ramas, sin tocar nada más.
+ *
+ * ⚠️ Nadie lo consume todavía: su cliente es el spec del mapper del activo
+ * (`__tests__/infrastructure/gateways/tatum-asset.mapper.spec.ts`, aún no en el árbol), así que
+ * hoy este arbitrario NO está ejercitado por ninguna aserción — solo compilado. Es andamio
+ * publicado por adelantado, no cobertura.
+ */
+export const transferAssetArb: fc.Arbitrary<TransferAssetSample> = fc.oneof(
+  nativeAssetArb,
+  fungibleAssetArb,
+  nftAssetArb,
+  multiTokenAssetArb,
+);

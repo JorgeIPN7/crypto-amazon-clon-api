@@ -54,7 +54,8 @@ const MAX_LENGTH = 79;
  * asset is a fungible token, Multi Token, or native blockchain currency) The amount of the asset
  * to transfer. Do not use if the asset is an NFT.», con `"100000"` de ejemplo. Ni una palabra
  * sobre la unidad — y lo omitido en una cita anterior no era relleno: decía para qué clases de
- * activo aplica el campo, que es justo lo que `TransferAsset` tendrá que hacer cumplir (Task 8).
+ * activo aplica el campo, que es justo lo que `TransferAsset.fromParts` (`transfer-asset.ts`)
+ * hace cumplir.
  *
  * Viaja como **string** de punta a punta, y esa es la decisión de fondo: por encima de 2^53 el
  * espaciado entre flotantes consecutivos pasa de 1, así que dos importes DISTINTOS colapsan en el
