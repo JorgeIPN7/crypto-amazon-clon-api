@@ -34,6 +34,13 @@ const config = {
   collectCoverageFrom: [
     'src/**/*.module.ts',
     'src/**/*.typeorm.repository.ts',
+    // Entra el 2026-08-31 con `sequence-address-index.allocator.e2e-spec.ts`. Mismo caso que un
+    // repositorio TypeORM: el sujeto es una secuencia del motor y su prueba no puede vivir en la
+    // suite unitaria. El patrón es el ESPEJO EXACTO del `!src/**/infrastructure/**/*.allocator.ts`
+    // de `jest.config.mjs` —`infrastructure/` incluido— para que el puerto
+    // `domain/ports/address-index.allocator.ts` siga midiéndose allí y solo allí; el razonamiento,
+    // con la medición, está en aquel archivo.
+    'src/**/infrastructure/**/*.allocator.ts',
     'src/database/data-source.ts',
     'src/database/seeds/**',
     'src/database/outbox/**',
@@ -76,6 +83,21 @@ const config = {
   // Los números más bajos del informe siguen siendo los mismos y siguen por encima:
   // `relay-orders-outbox.ts` 64.70 %, `data-source.ts` 33.33 % de funciones (solo la CLI ejecuta
   // el resto) y `seed-admin.ts` 82.25 %.
+  //
+  // **Remedido el 2026-08-31**, al entrar en el scope los dos repositorios TypeORM de `wallets` y
+  // `sequence-address-index.allocator.ts` (al entrar los dos repositorios TypeORM de `wallets` y el asignador):
+  //
+  //     statements  87.65  (suelo 84)      branches  42.43  (suelo 38)
+  //     functions   93.79  (suelo 88)      lines     90.48  (suelo 87)
+  //
+  // Los cuatro suelos se quedan como están: los cuatro pasan con 3.5-5.8 puntos de margen, que es
+  // el criterio de arriba. Subirlos a ras del número de hoy convertiría en CI roja el primer
+  // adaptador nuevo que entre sin E2E propio, y esa es la vía rápida a que alguien los baje sin
+  // mirar. El archivo más bajo del bloque nuevo es `sequence-address-index.allocator.ts`, 82.60 %
+  // de statements, y lo que reporta sin cubrir son las líneas 19-21 — que están DENTRO de su
+  // bloque JSDoc, o sea que no son código. Es el mismo artefacto de la instrumentación de SWC que
+  // enseñan los otros tres adaptadores del informe (21-23, 22-24, 23-25, también dentro de su
+  // JSDoc): no hay ninguna rama de `next()` sin ejercitar.
   coverageThreshold: {
     global: { branches: 38, functions: 88, lines: 87, statements: 84 },
   },

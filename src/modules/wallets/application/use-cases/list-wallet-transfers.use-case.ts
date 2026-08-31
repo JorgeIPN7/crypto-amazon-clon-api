@@ -27,9 +27,12 @@ export type ListWalletTransfersInput = {
  * y dos veces en `transfer-asset.use-case.ts`— que la delegan todos en «el consumidor». Este
  * archivo es hoy el único lector del libro en el árbol, y también la delega.
  *
- * Quien tendrá que aplicarla es el **DTO de respuesta del libro**, en `infrastructure/http/`, que
- * todavía no existe: medido con `find src/modules/wallets/infrastructure -name '*transfer*'`, que
- * no devuelve nada. Hasta entonces `GET /wallets/me/transfers` publicaría `submitting` tal cual —
+ * Quien tendrá que aplicarla es el **DTO de respuesta del libro**,
+ * `infrastructure/http/dto/wallet-transfer-response.dto.ts`. ⚠️ Aquí había una medición de su
+ * ausencia —`find src/modules/wallets/infrastructure -name '*transfer*'`, «no devuelve nada»— y se
+ * ha quitado porque se pudrió: ese `find` devuelve hoy los dos archivos de persistencia del libro,
+ * que no son el DTO. Lo que importa es el archivo, no el hueco.
+ * Hasta que ese DTO aplique la regla, `GET /wallets/me/transfers` publicaría `submitting` tal cual —
  * no es incorrecto (el vocabulario lo incluye), pero es MENOS honesto que `unknown`: dice «aún no
  * se sabe» de una petición que ya terminó.
  *
@@ -65,7 +68,8 @@ export type ListWalletTransfersInput = {
  * promete. Un corte por rol aquí sería código que solo puede divergir del de al lado.
  *
  * **Devuelve la `TransferPage` del puerto sin reenvolverla.** Componer la respuesta paginada es del
- * transporte, y ese controlador todavía no existe:
+ * transporte: lo hará `infrastructure/http/wallets.controller.ts` con el DTO paginado que ya
+ * publica `common/dto/`.
  */
 @Injectable()
 export class ListWalletTransfersUseCase {

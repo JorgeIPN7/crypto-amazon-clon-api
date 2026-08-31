@@ -143,11 +143,17 @@ export class WalletTransfer extends Entity<TransferId> {
    * validar, normalizar ni recortar. Es literalmente la cadena que toda la decisión de lista
    * cerrada existe para mantener fuera de esa respuesta.
    *
-   * **Quien tiene que cerrarlo es el esquema, y hoy no hay nadie**: la migración de
-   * `wallet_transfers` debe llevar un `CHECK ("reason_code" IS NULL OR "reason_code" IN (…los
-   * nueve…))`. Sin eso escrito aquí, el control no está en el calendario de nadie. La tabla
-   * todavía no existe: medido con `find src/database/migrations -name '*transfer*'`, que no
-   * devuelve nada.
+   * **Quien tiene que cerrarlo es el esquema, y hoy sigue sin haber nadie**: haría falta un
+   * `CHECK ("reason_code" IS NULL OR "reason_code" IN (…los nueve…))` sobre `wallet_transfers`.
+   * Sin eso escrito aquí, el control no está en el calendario de nadie.
+   *
+   * ⚠️ **Lo que ya NO es cierto es que falte la tabla.** `wallet_transfers` la crea
+   * `src/database/migrations/1787900000000-create-wallets.ts` —la misma que `wallets`— y lo que
+   * esa migración decide, con su motivo escrito, es no ponerle ningún `CHECK`. Aquí ponía «la
+   * tabla todavía no existe: medido con `find src/database/migrations -name '*transfer*'`, que no
+   * devuelve nada»: ese `find` sigue sin devolver nada hoy, porque el archivo se llama
+   * `create-wallets`, así que la medición era CIERTA y la conclusión FALSA. Es exactamente el
+   * `find` que se caza a sí mismo.
    */
   static rehydrate(params: {
     id: TransferId;

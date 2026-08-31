@@ -3,9 +3,11 @@ import { ValueObject } from '@shared/domain/value-object.base';
 import { InvalidAddressIndexError } from '../errors/wallet.errors';
 
 /**
- * El máximo de un `integer` de PostgreSQL, el tipo que tendrá la columna `address_index` cuando
- * la cree la migración del módulo. Hoy esa columna todavía no existe: medido con
- * `find src/database/migrations -name '*wallet*'`, que no devuelve nada.
+ * El máximo de un `integer` de PostgreSQL, que es el tipo REAL de la columna `address_index`: la
+ * crea `src/database/migrations/1787900000000-create-wallets.ts` como `integer NOT NULL`, y la
+ * secuencia que la alimenta se declara `AS integer` en esa misma migración. (Aquí ponía «hoy esa
+ * columna todavía no existe», medido con `find src/database/migrations -name '*wallet*'`; la
+ * migración aterrizó y la frase quedó invertida.)
  *
  * **El fallo que evita:** aceptar uno más aquí no evitaría el error, lo MUDARÍA al `INSERT` —
  * donde ya no se distingue de un problema del driver y llega después de haber gastado los
@@ -31,8 +33,8 @@ const MAX_ADDRESS_INDEX = 2_147_483_647;
  * entrega la secuencia de PostgreSQL es el 0, y el admin no consume ninguno (opera la master).
  *
  * ⚠️ Su error DEBE salir como **500**, no como 400 (spec §3.5), y hoy eso es una decisión
- * pendiente, no un hecho: quien la hará cierta es el mapa de `wallets-domain-exception.filter.ts`,
- * que todavía no existe —la crea la migración del módulo. Sin su fila
+ * pendiente, no un hecho: quien la hará cierta es el mapa de
+ * `infrastructure/http/wallets-domain-exception.filter.ts`. Sin su fila
  * explícita, el fallback del filtro lo publicaría como 400. El motivo: ningún cliente pasa un
  * índice por la API, así que si esto se dispara es la secuencia agotada o una fila corrupta, y
  * publicarlo como «entrada inválida» lo escondería del `ErrorReporter`, que solo ve 5xx.

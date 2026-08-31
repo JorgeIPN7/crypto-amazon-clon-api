@@ -103,6 +103,19 @@ const config = {
     //     `data-source.ts`/`migrations/`, no una excepción aparte.
     '!src/**/*.module.ts',
     '!src/**/*.typeorm.repository.ts',
+    //   - `infrastructure/**/*.allocator.ts`: mismo caso que un repositorio TypeORM. El sujeto de
+    //     `sequence-address-index.allocator.ts` es una secuencia del motor, así que su prueba vive
+    //     en la suite E2E y medirlo aquí penalizaría por seguir la convención del propio repo.
+    //     ⚠️ El patrón lleva `infrastructure/` a propósito y NO es `!src/**/*.allocator.ts`: ese
+    //     glob más corto se lleva por delante también el PUERTO,
+    //     `wallets/domain/ports/address-index.allocator.ts`, que sí tiene spec unitario
+    //     (`__tests__/domain/ports/address-index.allocator.spec.ts`) y no tiene por qué salir de
+    //     esta suite. Medido corriendo `jest --coverage --coverageReporters=text` con cada glob:
+    //     con el largo aparece la fila `address-index.allocator.ts` al 100 % dentro del bloque
+    //     `modules/wallets/domain/ports`; con el corto esa FILA desaparece. (El bloque de
+    //     directorio sigue saliendo en los dos casos, porque quedan los otros cuatro puertos: no
+    //     es «desaparece la carpeta», es «desaparece el archivo».)
+    '!src/**/infrastructure/**/*.allocator.ts',
     '!src/database/data-source.ts',
     '!src/database/migrations/**',
     '!src/database/seeds/**',

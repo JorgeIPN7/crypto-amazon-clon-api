@@ -110,10 +110,17 @@ export class Wallet extends Entity<WalletId> {
    * El de la fila leída es el `CHECK ("address" <> "owner_address")` del esquema, que además ve
    * las escrituras por SQL crudo —seed, migración, consola— que este constructor no vería jamás.
    *
-   * ⚠️ **Ese `CHECK` todavía NO existe**, así que hoy la fila leída no la protege nadie: medido
-   * con `find src/database/migrations -name '*wallet*'`, que no devuelve nada. Quien lo creará es
-   * la migración de las dos tablas del módulo; hasta entonces esto describe el reparto previsto,
-   * no una protección activa.
+   * ⚠️ **Ese `CHECK` YA existe y es una protección activa**, no un reparto previsto. Lo crea
+   * `src/database/migrations/1787900000000-create-wallets.ts` con el nombre
+   * `ck_wallets_address_not_master`, y quien lo comprueba contra el motor de verdad es el caso
+   * «debería traducir la violación del CHECK a WalletAddressIsMasterError» de
+   * `__tests__/infrastructure/persistence/wallet.typeorm.repository.e2e-spec.ts`, que inserta por
+   * el repositorio una wallet construida con este mismo `rehydrate` —la única forma real de
+   * esquivar el corte de `assign()`— y comprueba que PostgreSQL la para.
+   *
+   * (Aquí ponía «todavía NO existe», medido con `find src/database/migrations -name '*wallet*'`,
+   * «que no devuelve nada». Esa frase se quedó INVERTIDA al aterrizar la migración: le decía al
+   * lector que una protección no existía cuando sí existe, que es peor que no decir nada.)
    *
    * ⚠️ **Qué deja pasar exactamente, porque «no valida» no es lo mismo que «da igual».** Admite
    * las seis combinaciones de estado × txId, y DOS de ellas el dominio no las produce nunca:

@@ -13,13 +13,15 @@ import { TokenId } from './value-objects/token-id.vo';
  * tienen que cambiar a la vez.
  *
  * ⚠️ **`'multi-token'` va CON GUION.** El contrato congelado §1 lo fija como el literal único para
- * el dominio, el mapper, los dos DTO, el ejemplo de OpenAPI y la columna `asset_kind`; no existe
- * `'multitoken'`. ⚠️ Aquí decía que de esos cinco consumidores **no había ninguno en el árbol**;
- * desde el 2026-08-31 el mapper sí está, y es el primero. Recuento con
- * `grep -rln "multi-token" src/`: **diez** archivos —dominio (este, `wallet-transfer.entity.ts`,
- * un comentario de `token-id.vo.ts`), el mapper, y seis entre specs y helpers—. Los otros cuatro
- * consumidores del contrato (los dos DTO, el ejemplo de OpenAPI y la columna `asset_kind`) siguen
- * sin aterrizar.
+ * el dominio, los mappers, los dos DTO, el ejemplo de OpenAPI y la columna `asset_kind`; no existe
+ * `'multitoken'`.
+ *
+ * ⚠️ **Aquí vivía un recuento de archivos y se ha quitado, no actualizado.** Decía «diez» y ya
+ * valía once el día que se escribió; con `wallet-transfer.orm-entity.ts` y su mapper de
+ * persistencia son trece. Un inventario de este literal caduca cada vez que alguien añade un
+ * archivo que lo menciona —incluido un comentario como este, que el propio `grep` se cuenta—, así
+ * que el número no era el dato: el dato es que ninguna de esas escrituras puede divergir en
+ * silencio, y eso lo sostienen el getter `kind` y el tipo del arbitrario, medidos justo debajo.
  *
  * Esta lista, el `kind` de `TransferAssetState` y el catálogo de arbitrarios son **tres escrituras
  * del mismo literal**, y quien las ata son el getter `kind` y el tipo del arbitrario. Medido
@@ -83,8 +85,9 @@ export type TransferAssetMatchers<TResult> = {
  * Las partes en crudo, tal como llegan del DTO. `kind` es `string` a propósito — ver `fromParts`.
  *
  * ⚠️ La dirección del contrato se llama **`tokenAddress`**, igual que la columna `token_address` y
- * que el campo del snapshot de `WalletTransfer` (contrato congelado §4 y §8; ninguna de esas dos
- * piezas está todavía en el árbol). Las factorías, que reciben value objects ya construidos y no
+ * que el campo del snapshot de `WalletTransfer` (contrato congelado §4 y §8). Las dos piezas ya existen:
+ * `infrastructure/persistence/wallet-transfer.orm-entity.ts` y la migración que crea las dos
+ * tablas del módulo. Las factorías, que reciben value objects ya construidos y no
  * partes, la llaman `token`.
  */
 export type TransferAssetParts = {
@@ -122,10 +125,10 @@ export type TransferAssetParts = {
  * **El dominio no conoce los números `0`, `1`, `2` y `3`.** Son el `contractType` del contrato del
  * proveedor, no un concepto del negocio: la traducción vive en el adaptador
  * `infrastructure/gateways/tatum-asset.mapper.ts`, una rama de `match()` por clase. Ese archivo
- * aterrizó el 2026-08-31 y hasta entonces esta frase decía que no existía. Sigue siendo el ÚNICO
- * sitio del árbol donde se escriben esos cuatro números — medido con
- * `grep -rln "contractType" src/`, que devuelve TRES archivos: el mapper, su spec y este mismo
- * comentario. (Sí, el grep se caza a sí mismo; por eso se dice cuántos son y cuáles.)
+ * es el único sitio de PRODUCCIÓN donde se escriben esos cuatro números; fuera de él solo los
+ * escriben tests. Un `grep` por `contractType` devuelve además su spec, el del adaptador y este
+ * mismo comentario, así que la CIFRA que dé no significa nada — se caza a sí misma y crece cada
+ * vez que alguien explica la regla.
  */
 export class TransferAsset {
   private constructor(private readonly state: TransferAssetState) {}

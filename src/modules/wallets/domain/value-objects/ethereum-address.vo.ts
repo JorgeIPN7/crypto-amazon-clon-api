@@ -39,8 +39,8 @@ const ETHEREUM_ADDRESS = /^0x[0-9a-f]{40}$/;
  * minúsculas, es decir sin checksum que comprobar.
  *
  * ⚠️ **Hoy ese validador NO existe**, así que ahora mismo NADIE comprueba el checksum en todo el
- * sistema: no hay ningún archivo bajo `infrastructure/` en este módulo y `@noble/hashes` no está
- * en `package.json`. Es una decisión pendiente, no una protección activa.
+ * sistema: no existe `infrastructure/http/is-checksummed-address.validator.ts` y
+ * `@noble/hashes` no está en `package.json` —`grep -c noble package.json` devuelve 0—. Es una decisión pendiente, no una protección activa.
  *
  * Por qué no aquí, en dos hechos medidos y no supuestos:
  * - `node:crypto` no trae keccak256: `getHashes().filter(h => /keccak/i.test(h))` devuelve 0

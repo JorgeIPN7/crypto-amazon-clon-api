@@ -231,7 +231,17 @@ export class TransferAssetUseCase {
    * ⚠️ **Y lo que este método traga se traga en SILENCIO**, dicho en vez de escondido: no hay
    * logger ni `ErrorReporter` en la firma de este caso de uso —los cuatro puertos del contrato son
    * los del constructor—, así que un libro que deja de escribir no produce ninguna señal desde
-   * aquí. Quien la produce es el adaptador de persistencia, que todavía no existe:
+   * aquí.
+   *
+   * ⚠️ **Y tampoco la produce nadie más, que es el dato que hay que tener.** Una versión anterior
+   * de esta frase decía que la señal la daría «el adaptador de persistencia, que todavía no
+   * existe»; el adaptador ya existe —`infrastructure/persistence/wallet-transfer.typeorm.repository.ts`—
+   * y **no** emite ninguna: no lleva logger, no traduce nada (su JSDoc explica por qué la tabla no
+   * tiene restricción que nombrar) y el `logQueryError` del propio TypeORM está apagado, porque
+   * `buildTypeOrmOptions` toma `logging` de `DB_LOGGING`, cuyo `prefault` en `env.schema.ts` es
+   * `'false'`. Como el `catch` de `trySave` se come la excepción antes de que llegue a
+   * `AllExceptionsFilter`, el `ErrorReporter` tampoco la ve. Hoy, dos fallos de escritura seguidos
+   * no dejan rastro en ningún sitio salvo la propia fila, que se queda en `submitting`.
    */
   private async recordOutcome(transfer: WalletTransfer): Promise<void> {
     const saved = await this.trySave(transfer);
