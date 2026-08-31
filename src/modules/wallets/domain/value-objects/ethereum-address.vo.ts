@@ -10,9 +10,9 @@ import { InvalidEthereumAddressError } from '../errors/wallet.errors';
  * cadena mayor, y **no se reparten los casos por igual** — medido quitando cada una y corriendo
  * la suite ENTERA, no solo los dos casos de «basura»:
  *
- * - Sin `^`, `'zz0x…'` casaría, y **A11 es el único caso que muere** (`1 failed, 14 passed`).
+ * - Sin `^`, `'zz0x…'` casaría, y **A11 es el único caso que muere** (cae **un** caso).
  * - Sin `$`, mueren **DOS**: A12 (`'0x…zz'`) y también A8, los 41 hexadecimales — porque sus
- *   primeros 40 casan y el sobrante deja de importar (`2 failed, 13 passed`).
+ *   primeros 40 casan y el sobrante deja de importar (caen **2** casos).
  *
  * ⚠️ Una versión anterior de este comentario decía «ninguno de los otros trece muere por esa
  * causa». Era falso, y se coló porque la medición se hizo filtrando con `-t` solo A11 y A12: los

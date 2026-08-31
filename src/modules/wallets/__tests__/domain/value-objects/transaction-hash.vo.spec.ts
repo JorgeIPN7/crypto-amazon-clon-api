@@ -117,7 +117,7 @@ describe('TransactionHash', () => {
 
     // Sin el ancla `^`, la expresión encontraría el hash EN MEDIO de la basura y aceptaría esta
     // entrada. Es el único caso del archivo que muere por esa ancla: medido borrando `^` y
-    // corriendo el módulo ENTERO —no solo este archivo—, `1 failed, 112 passed`.
+    // corriendo el módulo ENTERO —no solo este archivo—, cae **un** caso.
     it('debería rechazar un hash precedido de basura', () => {
       // Arrange
       const prefixed = `zz${LOWERCASE}`;
@@ -132,7 +132,7 @@ describe('TransactionHash', () => {
 
     // El simétrico, y NO es simétrico en cuántos casos lo protegen: sin `$` mueren DOS —este y H7,
     // los 65 hexadecimales, porque sus primeros 64 casan y el sobrante deja de importar
-    // (`2 failed, 111 passed`, misma medición sobre el módulo entero). La asimetría es la misma que
+    // (caen **2** casos, misma medición sobre el módulo entero). La asimetría es la misma que
     // ya está medida en `ethereum-address.vo.ts`, y por eso aquí no se escribe «solo falla por el
     // ancla `$`»: sería falso.
     it('debería rechazar un hash seguido de basura', () => {

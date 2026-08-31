@@ -14,15 +14,18 @@ import { TokenId } from './value-objects/token-id.vo';
  *
  * ⚠️ **`'multi-token'` va CON GUION.** El contrato congelado §1 lo fija como el literal único para
  * el dominio, el mapper, los dos DTO, el ejemplo de OpenAPI y la columna `asset_kind`; no existe
- * `'multitoken'`. De esos cinco consumidores hoy **no hay ninguno en el árbol**: medido con
- * `grep -rn "multi-token" src/`, el literal solo aparece en dominio y tests —este archivo, su
- * spec, `__tests__/helpers/arbitraries.ts` y una línea de comentario de `token-id.vo.ts`—.
+ * `'multitoken'`. ⚠️ Aquí decía que de esos cinco consumidores **no había ninguno en el árbol**;
+ * desde el 2026-08-31 el mapper sí está, y es el primero. Recuento con
+ * `grep -rln "multi-token" src/`: **diez** archivos —dominio (este, `wallet-transfer.entity.ts`,
+ * un comentario de `token-id.vo.ts`), el mapper, y seis entre specs y helpers—. Los otros cuatro
+ * consumidores del contrato (los dos DTO, el ejemplo de OpenAPI y la columna `asset_kind`) siguen
+ * sin aterrizar.
  *
  * Esta lista, el `kind` de `TransferAssetState` y el catálogo de arbitrarios son **tres escrituras
  * del mismo literal**, y quien las ata son el getter `kind` y el tipo del arbitrario. Medido
  * escribiendo `multitoken` aquí, `tsc` saca **DOS** `TS2322` —`transfer-asset.ts(206,5)`, el
  * getter, y `arbitraries.ts(152,7)`, el catálogo— y Jest tumba exactamente un caso del módulo, el
- * F23, con `1 failed, 139 passed`.
+ * F23, con cae **un** caso.
  *
  * ⚠️ La cuenta cambió DENTRO de esta misma tarea: eran dos escrituras y un solo `TS2322` hasta que
  * el catálogo de arbitrarios entró unos pasos después. Un inventario medido caduca cuando alguien
@@ -117,10 +120,12 @@ export type TransferAssetParts = {
  * compara dos activos.
  *
  * **El dominio no conoce los números `0`, `1`, `2` y `3`.** Son el `contractType` del contrato del
- * proveedor, no un concepto del negocio: la traducción vivirá en el adaptador
- * `infrastructure/gateways/tatum-asset.mapper.ts`, una línea por rama de `match()`. Ese archivo
- * todavía no existe —medido: `find src/modules/wallets -name 'tatum-asset.mapper.ts'` no devuelve
- * nada—, así que hoy nadie traduce nada y el dominio es el único que habla de activos.
+ * proveedor, no un concepto del negocio: la traducción vive en el adaptador
+ * `infrastructure/gateways/tatum-asset.mapper.ts`, una rama de `match()` por clase. Ese archivo
+ * aterrizó el 2026-08-31 y hasta entonces esta frase decía que no existía. Sigue siendo el ÚNICO
+ * sitio del árbol donde se escriben esos cuatro números — medido con
+ * `grep -rln "contractType" src/`, que devuelve TRES archivos: el mapper, su spec y este mismo
+ * comentario. (Sí, el grep se caza a sí mismo; por eso se dice cuántos son y cuáles.)
  */
 export class TransferAsset {
   private constructor(private readonly state: TransferAssetState) {}
@@ -252,7 +257,7 @@ export class TransferAsset {
    * este archivo y `wallet.errors.spec.ts`—, así que es el único sitio donde la inversión puede
    * colarse. Y se cuela en verde para el compilador: medido invirtiendo los dos argumentos en las
    * dos llamadas de abajo, `tsc --noEmit` **no dice nada** y quien la caza es la suite, con
-   * `9 failed, 131 passed` en el módulo — los siete casos puntuales de mensaje exacto (F12-F18)
+   * caen **9** casos en el módulo — los siete casos puntuales de mensaje exacto (F12-F18)
    * más las propiedades P2 y P3.
    */
   private static requiredField(kind: string, field: string, value: string | undefined): string {

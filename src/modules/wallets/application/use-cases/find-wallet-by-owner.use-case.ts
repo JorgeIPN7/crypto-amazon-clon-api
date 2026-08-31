@@ -45,7 +45,7 @@ export type FindWalletByOwnerInput = {
  * ⚠️ **El estado que publica puede ir POR DETRÁS de la cadena**: la reconciliación es perezosa y
  * vive en activar y en transferir, no aquí (spec §5.4). Es deuda escrita, y la `description` de
  * `GET /wallets/me` tendrá que decirla en `infrastructure/http/wallets.controller.ts` — que hoy no
- * existe: medido, `find src/modules/wallets/infrastructure` responde `No such file or directory`.
+ * existe:
  */
 @Injectable()
 export class FindWalletByOwnerUseCase {

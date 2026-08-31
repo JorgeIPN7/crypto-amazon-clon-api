@@ -11,9 +11,9 @@ import { InvalidTokenIdError } from '../errors/wallet.errors';
  * módulo (99 casos), no solo este archivo:
  *
  * - Sin `^` caen **siete**: `'01'`, `'1.0'`, `'+1'`, `'-1'`, `' 1'`, `'0x1'` y la propiedad P2,
- *   porque en todos ellos hay un entero canónico pegado al final — `7 failed, 92 passed`.
+ *   porque en todos ellos hay un entero canónico pegado al final — caen **7** casos.
  * - Sin `$` caen **cinco**: `'01'` —la alternativa `0` casa el primer carácter y el resto deja de
- *   importar—, `'1.0'`, `'1 '`, `'0x1'` y P2 — `5 failed, 94 passed`.
+ *   importar—, `'1.0'`, `'1 '`, `'0x1'` y P2 — caen **5** casos.
  *
  * ⚠️ La tabla de casos anotaba `' 1'` como «solo falla por el ancla `^`» y `'1 '` como «solo falla
  * por el ancla `$`». En la lectura «es el único que muere por esa ancla» las dos son falsas: son
@@ -71,7 +71,7 @@ const MAX_DIGITS = 78;
  *
  * ⚠️ «Arreglar» esa asimetría igualando los dos VOs es, por tanto, un cambio de UNA línea, y
  * rompería toda colección cuyo primer token es el 0. Medido añadiendo `|| !/[1-9]/.test(value)` a
- * la guarda y corriendo la suite entera del módulo: `2 failed, 97 passed`, tres veces seguidas.
+ * la guarda y corriendo la suite entera del módulo: caen **2** casos, tres veces seguidas.
  * Quien lo intente choca con dos casos, y solo uno de los dos es de fiar: **K1 muere siempre**,
  * mientras que P1 muere porque `tokenIdArb` lleva `fc.constant('0')` dentro de su `fc.oneof` — eso
  * es estocástico, depende de que salga el `'0'` en alguna de las 100 ejecuciones. K1 es el que
@@ -84,7 +84,7 @@ const MAX_DIGITS = 78;
  * ⚠️ **No recorta espacios**, a diferencia de `EthereumAddress`. Un id con espacios no es un
  * formato alternativo de nada: es una entrada rota. Lo fijan K10 y K11, y son exactamente esos dos y
  * ningún otro — medido metiendo un `raw.trim()` al principio de `from()` y corriendo la suite entera
- * del módulo: `2 failed, 97 passed`.
+ * del módulo: caen **2** casos.
  */
 export class TokenId extends ValueObject<string> {
   /**
@@ -100,7 +100,7 @@ export class TokenId extends ValueObject<string> {
    * ⚠️ Esa P2 es una propiedad de `fast-check` SIN semilla fija: el contraejemplo cambia entre
    * ejecuciones, el desenlace no. Todo valor que `leadingZeroTokenIdArb` puede producir empieza por
    * al menos un `0` seguido de un dígito no nulo, así que el mutante muere en el primero que
-   * genere — repetida tres veces la fila de `CANONICAL_INTEGER`, `9 failed, 90 passed` las tres.
+   * genere — repetida tres veces la fila de `CANONICAL_INTEGER`, caen **9** casos las tres.
    *
    * El orden de las dos no cambia el resultado —el error es el mismo la dispare quien la dispare, y
    * la regex no lleva la bandera `g`, así que `test()` no arrastra estado entre llamadas—: la

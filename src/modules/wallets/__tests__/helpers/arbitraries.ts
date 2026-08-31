@@ -24,11 +24,13 @@ import { TokenId } from '../../domain/value-objects/token-id.vo';
  * que importa este archivo desde el primer día del módulo.
  *
  * El bloque que cierra el archivo, `pageArb` / `limitArb`, es el único que no describe el dominio
- * sino el BORDE HTTP: sus límites salen de `common/dto/pagination.dto.ts` y no de aquí. A
- * diferencia de `transferAssetArb`, **ya está ejercitado**: su cliente es la propiedad de
- * `__tests__/application/use-cases/list-wallet-transfers.use-case.spec.ts` (medido: `find
- * src/modules/wallets/__tests__/application/use-cases -name 'list-*'` devuelve ese archivo y solo
- * ese; hasta que aterrizó, no devolvía nada).
+ * sino el BORDE HTTP: sus límites salen de `common/dto/pagination.dto.ts` y no de aquí. Su cliente
+ * es la propiedad de `__tests__/application/use-cases/list-wallet-transfers.use-case.spec.ts`
+ * (medido: `find src/modules/wallets/__tests__/application/use-cases -name 'list-*'` devuelve ese
+ * archivo y solo ese; hasta que aterrizó, no devolvía nada).
+ *
+ * ⚠️ Aquí decía «a diferencia de `transferAssetArb`, ya está ejercitado». Esa contraposición
+ * caducó: hoy los dos lo están — ver el JSDoc de `transferAssetArb`.
  */
 
 const HEX_DIGITS = '0123456789abcdefABCDEF';
@@ -171,10 +173,14 @@ const multiTokenAssetArb: fc.Arbitrary<TransferAssetSample> = fc
  * que endurecer un value object llegue solo a estas propiedades: un `TokenAmount` más estricto
  * cambia `tokenAmountArb` y con él las cuatro ramas, sin tocar nada más.
  *
- * ⚠️ Nadie lo consume todavía: su cliente es el spec del mapper del activo
- * (`__tests__/infrastructure/gateways/tatum-asset.mapper.spec.ts`, aún no en el árbol), así que
- * hoy este arbitrario NO está ejercitado por ninguna aserción — solo compilado. Es andamio
- * publicado por adelantado, no cobertura.
+ * ⚠️ **Ya está ejercitado**, y este JSDoc decía lo contrario —«nadie lo consume todavía … solo
+ * compilado»— hasta el 2026-08-31. Censo medido con `grep -rn "transferAssetArb" src/`, que fuera
+ * de este archivo devuelve **dos** consumidores y solo dos:
+ *
+ * - `__tests__/domain/entities/wallet-transfer.entity.spec.ts`, con un `fcTest.prop`, que llegó
+ *   con el libro de transferencias y es quien primero lo estrenó;
+ * - `__tests__/infrastructure/gateways/tatum-asset.mapper.spec.ts`, con sus dos propiedades, que
+ *   es para quien se escribió el campo `values`.
  */
 export const transferAssetArb: fc.Arbitrary<TransferAssetSample> = fc.oneof(
   nativeAssetArb,

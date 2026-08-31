@@ -11,9 +11,9 @@ import { InvalidTransactionHashError } from '../errors/wallet.errors';
  * y **no se reparten los casos por igual** — medido borrando cada una y corriendo el módulo ENTERO,
  * no solo los dos casos de «basura»:
  *
- * - Sin `^`, `'zz0x…'` casaría, y **H10 es el único caso que muere** (`1 failed, 112 passed`).
+ * - Sin `^`, `'zz0x…'` casaría, y **H10 es el único caso que muere** (cae **un** caso).
  * - Sin `$`, mueren **DOS**: H11 (`'0x…zz'`) y también H7, los 65 hexadecimales — porque sus
- *   primeros 64 casan y el sobrante deja de importar (`2 failed, 111 passed`).
+ *   primeros 64 casan y el sobrante deja de importar (caen **2** casos).
  */
 const TRANSACTION_HASH = /^0x[0-9a-f]{64}$/;
 
@@ -45,11 +45,15 @@ const TRANSACTION_HASH = /^0x[0-9a-f]{64}$/;
  * enviada y lo que el cliente recibe es un error. El dominio no puede taparlo: no conoce la forma
  * del proveedor, y taparlo aquí significaría aceptar hashes sin prefijo también por HTTP.
  *
- * ⚠️ **Hoy ese adaptador NO existe**, así que la normalización no está puesta en ninguna parte:
- * `find src/modules/wallets -mindepth 1 -maxdepth 1` devuelve solo `domain` y `__tests__` —no hay
- * capa `infrastructure`—, y `find src -name "tatum-custodial-address.gateway.ts"` no devuelve nada.
- * Es una deuda abierta, no una protección activa; quien escriba ese archivo tiene que prefijar
- * antes de llamar a `from()`.
+ * ⚠️ **Quien prefija es `readTxId()` en
+ * `infrastructure/gateways/tatum-custodial-address.gateway.ts`**, y esa es hoy la única
+ * normalización del árbol. Quien escriba otro adaptador que reciba hashes del proveedor tiene
+ * que prefijar antes de llamar aquí.
+ *
+ * ⚠️ Una versión anterior de este párrafo decía «hoy ese adaptador NO existe, así que la
+ * normalización no está puesta en ninguna parte», con dos `find` al lado. Caducó al aterrizar
+ * ese adaptador, y era peor que un dato viejo: le decía al siguiente lector que la protección
+ * contra el hash sin prefijo no existía cuando sí existe.
  */
 export class TransactionHash extends ValueObject<string> {
   /**
@@ -69,7 +73,7 @@ export class TransactionHash extends ValueObject<string> {
    *
    * Medido las dos veces, con el módulo entero: **sin** H13, sustituir
    * `new InvalidTransactionHashError(value)` por `(normalized)` deja `113 passed` y no cae ni uno;
-   * **con** H13, ese mismo cambio da `1 failed, 113 passed` y el único que cae es H13.
+   * **con** H13, ese mismo cambio da cae **un** caso y el único que cae es H13.
    *
    * ⚠️ La mutación tampoco lo cazaría: Stryker no genera el mutante «cambia un identificador por
    * otro del mismo ámbito». Este caso no aporta score, aporta la única protección que existe.

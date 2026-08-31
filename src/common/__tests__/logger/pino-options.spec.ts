@@ -387,6 +387,52 @@ describe('DEFAULT_REDACT_PATHS (contra un pino real)', () => {
   });
 });
 
+/**
+ * La clave privada de la master viaja en el CUERPO de cada transferencia y es el único secreto
+ * del ciclo que no es un hash. Estos casos no leen la lista de rutas: montan un pino real y
+ * comprueban que la redacción llega, que es la parte que la sintaxis de comodines decide.
+ *
+ * La defensa de verdad está en que los errores del adaptador no lleven el cuerpo dentro
+ * (`src/modules/wallets/__tests__/infrastructure/gateways/tatum-secret-surface.spec.ts`); esto
+ * es la red por debajo.
+ */
+describe('DEFAULT_REDACT_PATHS (la clave privada de la master)', () => {
+  it.each(['privateKey', 'masterPrivateKey', 'fromPrivateKey'])(
+    'debería tapar err.%s',
+    (property) => {
+      // Arrange
+      const error = Object.assign(new Error('fallo del proveedor'), {
+        [property]: FAKE_MASTER_PRIVATE_KEY,
+      });
+
+      // Act
+      const line = captureFatal(error);
+
+      // Assert
+      expect(line).not.toContain(FAKE_MASTER_PRIVATE_KEY);
+      expect(JSON.parse(line)).toMatchObject({ err: { [property]: '[REDACTED]' } });
+    },
+  );
+
+  // El límite, escrito en vez de descubierto: el comodín `*.x` casa a profundidad DOS y nada
+  // más. Medido con pino 10.3.1: con este mismo caso, `{ request: { fromPrivateKey } }` colgado
+  // del error sale del logger SIN tapar. Es la misma limitación que ya tienen `*.password` y
+  // compañía, y el motivo por el que un error que arrastre la petición dentro NO queda cubierto
+  // por esta lista.
+  it('debería NO tapar la clave anidada a un nivel más, que es el límite del comodín', () => {
+    // Arrange
+    const error = Object.assign(new Error('fallo del proveedor'), {
+      request: { fromPrivateKey: FAKE_MASTER_PRIVATE_KEY },
+    });
+
+    // Act
+    const line = captureFatal(error);
+
+    // Assert
+    expect(line).toContain(FAKE_MASTER_PRIVATE_KEY);
+  });
+});
+
 describe('buildPrettyTransport', () => {
   it('debería devolver undefined cuando pretty está deshabilitado', () => {
     // Act
@@ -458,6 +504,9 @@ const buildResponse = (): ServerResponse & { setHeader: jest.Mock } =>
 /** Forma real de un hash argon2id, con sal y digest inventados: no abre ninguna cuenta. */
 const FAKE_ARGON2_HASH =
   '$argon2id$v=19$m=65536,p=4,t=3$c2FsLWRlLW1lbnRpcmE$ZGlnZXN0LWRlLW1lbnRpcmE';
+
+/** Entropía nula a propósito: gitleaks no debe disparar sobre un archivo de test. */
+const FAKE_MASTER_PRIVATE_KEY = `0x${'ab'.repeat(32)}`;
 
 /**
  * Un `QueryFailedError` construido igual que lo construye el `PostgresQueryRunner`: consulta,

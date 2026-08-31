@@ -65,8 +65,7 @@ export type ListWalletTransfersInput = {
  * promete. Un corte por rol aquí sería código que solo puede divergir del de al lado.
  *
  * **Devuelve la `TransferPage` del puerto sin reenvolverla.** Componer la respuesta paginada es del
- * transporte, y ese controlador todavía no existe: medido, `find src/modules/wallets/infrastructure`
- * responde `No such file or directory`.
+ * transporte, y ese controlador todavía no existe:
  */
 @Injectable()
 export class ListWalletTransfersUseCase {

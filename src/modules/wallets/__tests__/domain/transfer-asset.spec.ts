@@ -62,7 +62,7 @@ describe('TransferAsset', () => {
     // `token-id.vo.ts`—, nunca en un mapper, un DTO ni una migración.
     //
     // Este caso es el único de la suite que lo ancla EN EL VOCABULARIO: medido escribiendo
-    // `multitoken` en `TRANSFER_ASSET_KINDS`, `1 failed, 139 passed` en el módulo entero, y el que
+    // `multitoken` en `TRANSFER_ASSET_KINDS`, cae **un** caso en el módulo entero, y el que
     // cae es este. Los demás casos que citan `multi-token` —F3, F22, P1— leen el literal del
     // ESTADO, que es otra escritura, y sobreviven. Lo que sí se pone rojo a la vez es `tsc`, con
     // `TS2322` en el getter `kind`, porque el estado y el vocabulario dejan de coincidir.

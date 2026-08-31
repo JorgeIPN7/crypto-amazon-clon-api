@@ -34,8 +34,7 @@ export type AssignWalletInput = {
  * dos, rompiendo la invariante «una sola EOA en el sistema». Escrita en el borde HTTP, la regla se
  * saltaba con solo llamar al caso de uso desde otro sitio; escrita aquí, el único camino pasa por
  * ella y el filtro del contexto la publicará como 409 igual que cualquier otro error de dominio.
- * ⚠️ Ese filtro todavía NO existe —medido: `find src/modules/wallets/infrastructure` responde
- * `No such file or directory`—, así que hoy este error es un 409 previsto, no publicado.
+ * ⚠️ Ese filtro todavía NO existe , así que hoy este error es un 409 previsto, no publicado.
  *
  * **Si la pasarela falla, lo que queda huérfano es un NÚMERO, no una fila** — por eso no hay
  * compensación y escribirla sería ceremonia. La compensación existe para desbloquear un reintento,

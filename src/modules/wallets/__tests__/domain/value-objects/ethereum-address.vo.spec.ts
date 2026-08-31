@@ -153,7 +153,7 @@ describe('EthereumAddress', () => {
 
     // El JSDoc de `from()` afirma que el error lleva el valor CRUDO, y hasta este caso NADA lo
     // protegía. Medido cambiando `new InvalidEthereumAddressError(value)` por `(normalized)` y
-    // corriendo el módulo ENTERO, no solo este archivo: `1 failed, 58 passed` — este es el único
+    // corriendo el módulo ENTERO, no solo este archivo: cae **un** caso — este es el único
     // que cae. La causa de que los demás no se enteren es que en A6-A12 la entrada ya cumple
     // `raw === raw.trim().toLowerCase()`, así que las dos cadenas son la misma y el cambio es
     // invisible. Por eso esta entrada trae espacios Y mayúsculas a la vez: quitarle cualquiera de

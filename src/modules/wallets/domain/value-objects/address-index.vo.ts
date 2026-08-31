@@ -32,7 +32,7 @@ const MAX_ADDRESS_INDEX = 2_147_483_647;
  *
  * ⚠️ Su error DEBE salir como **500**, no como 400 (spec §3.5), y hoy eso es una decisión
  * pendiente, no un hecho: quien la hará cierta es el mapa de `wallets-domain-exception.filter.ts`,
- * que todavía no existe —no hay ningún archivo bajo `infrastructure/` en este módulo—. Sin su fila
+ * que todavía no existe —la crea la migración del módulo. Sin su fila
  * explícita, el fallback del filtro lo publicaría como 400. El motivo: ningún cliente pasa un
  * índice por la API, así que si esto se dispara es la secuencia agotada o una fila corrupta, y
  * publicarlo como «entrada inválida» lo escondería del `ErrorReporter`, que solo ve 5xx.

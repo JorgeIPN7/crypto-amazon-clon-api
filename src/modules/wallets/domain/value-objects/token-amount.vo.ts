@@ -11,9 +11,9 @@ import { InvalidTokenAmountError } from '../errors/wallet.errors';
  * suite ENTERA del módulo (85 casos), no solo los dos casos de espacios:
  *
  * - Sin `^` caen **seis**: `'01'`, `'+1'`, `'.5'`, `'-1'`, `' 1'` y `'1e18'`, porque en todos ellos
- *   hay un importe canónico pegado al final (`1`, `5`, `18`) — `6 failed, 79 passed`.
+ *   hay un importe canónico pegado al final (`1`, `5`, `18`) — caen **6** casos.
  * - Sin `$` caen **cuatro**: `'01'` —la alternativa `0` casa el primer carácter y el resto deja de
- *   importar—, `'1.'`, `'1 '` y `'1e18'` — `4 failed, 81 passed`.
+ *   importar—, `'1.'`, `'1 '` y `'1e18'` — caen **4** casos.
  *
  * ⚠️ El plan de esta tarea afirmaba que `' 1'` era «el único caso de la tabla que muere solo por
  * esa ancla». La medición de arriba lo desmiente en sus dos lecturas posibles: por `^` no cae uno
@@ -92,7 +92,7 @@ const MAX_LENGTH = 79;
  * ⚠️ **No recorta espacios**, a diferencia de `EthereumAddress`. Un importe con espacios no es un
  * formato alternativo de nada: es una entrada rota. Lo fijan M15 y M16, y son exactamente esos dos
  * y ningún otro: medido metiendo un `raw.trim()` al principio de `from()` y corriendo la suite
- * entera del módulo — `2 failed, 83 passed`.
+ * entera del módulo — caen **2** casos.
  *
  * La asimetría con `TokenId` (`token-id.vo.ts`) es deliberada: ese VO **sí acepta `"0"`**, porque
  * el token 0 existe. Aquí el cero se rechaza en todas sus formas —`0`, `0.0`, `0.000`— porque un

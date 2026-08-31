@@ -18,7 +18,7 @@ export const TRANSFER_OWNER_ID = '9d2a1c7e-1f6b-4a2e-9c3d-77a1b0e5f012';
 export const TRANSFER_FROM_ADDRESS = '0x1c3b5d7e90a2d4e6f8a19f2e6c1b4a8d3f5e7c0b';
 
 export const TRANSFER_RECIPIENT_ADDRESS = '0x5d7e90a2d4e6f8a19f2e6c1b4a8d3f5e7c0b1c3b';
-export const TRANSFER_TOKEN_ADDRESS = '0x782919afc85eea2cb736874225456bb5d3e242ba';
+export const TRANSFER_CONTRACT = '0x782919afc85eea2cb736874225456bb5d3e242ba';
 export const TRANSFER_TX = '0x9c1b4a8d3f5e7c0b9a2d4e6f8a1c3b5d7e901c3b5d7e90a2d4e6f8a19f2e6c1b';
 
 const STARTED_AT = new Date('2026-08-27T10:00:00.000Z');
@@ -52,7 +52,7 @@ export type TransferOverrides = {
  */
 const partsFor = (overrides: TransferOverrides): TransferAssetParts => {
   const kind = overrides.assetKind ?? 'native';
-  const tokenAddress = overrides.tokenAddress ?? TRANSFER_TOKEN_ADDRESS;
+  const tokenAddress = overrides.tokenAddress ?? TRANSFER_CONTRACT;
   const amount = overrides.amount ?? DEFAULT_AMOUNT;
   const tokenId = overrides.tokenId ?? DEFAULT_TOKEN_ID;
 

@@ -476,7 +476,7 @@ const rehydrateWallet = (row: {
     // quién», según `shared/domain/system-actor.ts`—, así que con `??` el `createdBy: null` que
     // A17 pasa a propósito se convertía en `ACTOR_ID` y el caso no podía pasar nunca. Medido, no
     // supuesto: con `?? ACTOR_ID` la salida era
-    // `- "createdBy": null` / `+ "createdBy": "5b7c2d4e-…"`, `1 failed, 18 passed`.
+    // `- "createdBy": null` / `+ "createdBy": "5b7c2d4e-…"`, cae **un** caso.
     // Las fechas no tienen el problema porque `Date | null` no está en la firma: ahí sí son
     // equivalentes.
     createdBy: row.createdBy === undefined ? ACTOR_ID : row.createdBy,

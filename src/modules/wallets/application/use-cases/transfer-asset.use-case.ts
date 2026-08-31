@@ -231,8 +231,7 @@ export class TransferAssetUseCase {
    * ⚠️ **Y lo que este método traga se traga en SILENCIO**, dicho en vez de escondido: no hay
    * logger ni `ErrorReporter` en la firma de este caso de uso —los cuatro puertos del contrato son
    * los del constructor—, así que un libro que deja de escribir no produce ninguna señal desde
-   * aquí. Quien la produce es el adaptador de persistencia, que todavía no existe: medido, `find
-   * src/modules/wallets/infrastructure` responde `No such file or directory`.
+   * aquí. Quien la produce es el adaptador de persistencia, que todavía no existe:
    */
   private async recordOutcome(transfer: WalletTransfer): Promise<void> {
     const saved = await this.trySave(transfer);

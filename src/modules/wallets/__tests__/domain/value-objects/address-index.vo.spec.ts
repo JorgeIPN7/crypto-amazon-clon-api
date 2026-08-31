@@ -20,7 +20,7 @@ describe('AddressIndex', () => {
     // ENTERO (66 casos), no filtrando con `-t` — el error que ya se cometió una vez en
     // `ethereum-address.vo.ts`, donde filtrar dejó casos en `skipped` y produjo una afirmación
     // falsa. Este de aquí caza el `>=`: con `value >= MAX_ADDRESS_INDEX`, el último índice
-    // utilizable se rechazaría y `1 failed, 65 passed` — este caso cae SIEMPRE (P1 también, pero solo a veces: es una propiedad sin semilla fija).
+    // utilizable se rechazaría y cae **un** caso — este caso cae SIEMPRE (P1 también, pero solo a veces: es una propiedad sin semilla fija).
     it('debería aceptar exactamente el máximo de un integer de PostgreSQL', () => {
       // Act
       const index = AddressIndex.from(2_147_483_647);
@@ -30,7 +30,7 @@ describe('AddressIndex', () => {
     });
 
     // El simétrico, y el que caza que el tope NO se compruebe: quitando la cláusula
-    // `value > MAX_ADDRESS_INDEX` entera, `1 failed, 65 passed` — este es el único que cae, X2
+    // `value > MAX_ADDRESS_INDEX` entera, cae **un** caso — este es el único que cae, X2
     // sigue verde. Es también el único caso que afirma sobre `error.value`, que es lo que fija
     // que el error transporte el índice y no otra cosa.
     it('debería rechazar el primer índice que la columna ya no puede guardar', () => {
@@ -47,7 +47,7 @@ describe('AddressIndex', () => {
     // PostgreSQL del compose, no supuesto: `SELECT (-1)::integer` devuelve `-1` y
     // `SELECT (-2147483648)::integer` devuelve `-2147483648` — la columna guardaría el −1 sin
     // protestar. Lo que lo prohíbe es que la secuencia del §5.1 nunca entrega un índice negativo.
-    // Quitando `value < 0`, `1 failed, 65 passed` — este caso es el único que cae.
+    // Quitando `value < 0`, cae **un** caso — este caso es el único que cae.
     it('debería rechazar un índice negativo', () => {
       // Act
       const error = captureError(() => AddressIndex.from(-1));
@@ -69,7 +69,7 @@ describe('AddressIndex', () => {
     // `NaN` NO lo caza ninguna de las dos comparaciones: `NaN < 0` y `NaN > MAX` son las dos
     // `false`, así que sin `Number.isInteger` entraría como índice válido y acabaría en la columna.
     // Es lo que hace que X5 y X6 no sean el mismo caso repetido: quitando esa cláusula caen LOS
-    // DOS (`2 failed, 64 passed`), y es la única fila de la medición donde muere más de uno.
+    // DOS (caen **2** casos), y es la única fila de la medición donde muere más de uno.
     it('debería rechazar NaN', () => {
       // Act
       const error = captureError(() => AddressIndex.from(Number.NaN));

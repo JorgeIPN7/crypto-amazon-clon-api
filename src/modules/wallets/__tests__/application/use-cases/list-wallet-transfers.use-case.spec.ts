@@ -70,7 +70,7 @@ describe('ListWalletTransfersUseCase', () => {
 
       // Assert: el dueño sale del `sub` del token y llega hasta el criterio sin pasar por el
       // cuerpo ni por la ruta. Medido sustituyendo `input.ownerId` por el literal de
-      // `OTHER_OWNER_ID` en el criterio del caso de uso: `4 failed, 2 passed` — este caso, los dos
+      // `OTHER_OWNER_ID` en el criterio del caso de uso: caen **4** casos — este caso, los dos
       // primeros y la propiedad. Los que aguantan son la página vacía, que sale vacía con
       // cualquier dueño, y el de la aridad, que no llama a `execute()`.
       expect(ledger.findByOwnerCalls[0]?.ownerId).toBe(OWNER_ID);
