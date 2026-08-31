@@ -453,11 +453,30 @@ seguidas con el mismo reparto por archivo.
 
 ---
 
-## 18. Las propiedades de `fast-check` no matan mutantes: Stryker nunca las ejecuta
+## 18. Una propiedad escrita con `fcTest.prop` no mata mutantes: Stryker nunca la ejecuta
 
 **Qué pasa.** Un test escrito con `fcTest.prop` de `@fast-check/jest` **no aporta ni un mutante
 muerto** al gate de mutación, por bien escrito que esté. Stryker lo cuenta como cobertura y
 después no lo ejecuta contra ningún mutante.
+
+⚠️ **El título de esta entrada decía «las propiedades de `fast-check`» y generalizaba de más.**
+El problema no es la propiedad: es el envoltorio. Medido al escribir
+`list-wallet-transfers.use-case.spec.ts`, una propiedad escrita con `fc.assert(...)` dentro de un
+`it` normal **SÍ mata mutantes** —`killed 2` en ese archivo y `killed 5` en
+`find-wallet-by-owner.use-case.ts`, en los dos casos poniendo los casos puntuales en `it.skip`
+para que la propiedad fuera el único test superviviente—. La causa es exactamente la de abajo: lo
+que rompe el emparejamiento es que `@fast-check/jest` mete la semilla en el NOMBRE, y `fc.assert`
+no lo hace.
+
+⚠️ **Y un matiz que explica por qué al principio pareció que `fc.assert` tampoco mataba:** en un
+archivo con casos puntuales, Stryker atribuye la muerte al PRIMER test que la produce, así que la
+propiedad sale como `covered N, killed 0` aunque sea capaz de matar. «No se le atribuye ninguna
+muerte» y «no puede matar» son cosas distintas, y solo la segunda es un defecto.
+
+**La regla práctica no cambia**, y ahora se sostiene por otro motivo: una rama que solo mira una
+propiedad queda sin anclar si esa propiedad usa `fcTest.prop`, y queda anclada de forma frágil
+si usa `fc.assert` —depende de que ningún caso puntual la adelante—. **Ancla cada rama con un
+caso puntual**; la propiedad explora.
 
 **La causa, medida y no supuesta.** `stryker.config.mjs` usa `coverageAnalysis: 'perTest'`, que
 empareja tests por NOMBRE entre la corrida seca y la del mutante. Y `@fast-check/jest` mete la

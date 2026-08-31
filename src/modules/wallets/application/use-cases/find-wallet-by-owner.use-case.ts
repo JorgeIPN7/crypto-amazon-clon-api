@@ -4,18 +4,12 @@ import { WalletNotFoundError } from '../../domain/errors/wallet.errors';
 import { WalletRepository } from '../../domain/ports/wallet.repository';
 
 import type { Wallet } from '../../domain/entities/wallet.entity';
+import { ADMIN_ROLE } from '../../domain/admin-role';
 
 export type FindWalletByOwnerInput = {
   ownerId: string;
   ownerRole: string;
 };
-
-/**
- * Rol cuya dirección es la master. Literal y no `USER_ROLES` de `users`, por lo mismo que en
- * `assign-wallet.use-case.ts`: la regla 2 del gate de fronteras prohíbe a `application/` importar
- * nada de otro módulo, y `common` publica el rol como `string` por ese mismo motivo.
- */
-const ADMIN_ROLE = 'admin';
 
 /**
  * Lectura de «mi wallet»: un solo puerto, y las tres cosas que NO hace pesan más que la que hace.
@@ -37,7 +31,8 @@ const ADMIN_ROLE = 'admin';
  * ⚠️ **La garantía que eso NO da, dicha en vez de escondida: un dueño desactivado cuyo JWT sigue
  * vivo PUEDE leer su wallet aquí**, hasta que el token expire. No podrá activarla ni transferir
  * —esos dos caminos sí pasan por el directorio y responden `WalletOwnerGoneError`, como ya hace
- * `assign-wallet.use-case.ts`, el único de los tres que hoy está escrito—, pero leer la dirección y
+ * `assign-wallet.use-case.ts`, `activate-wallet.use-case.ts` y `transfer-asset.use-case.ts`—,
+ * pero leer la dirección y
  * el estado, sí. Es el precio aceptado de no consultar; quien quiera cerrarlo tiene que pagar la
  * consulta en cada lectura, no «arreglar» la omisión por simetría.
  *

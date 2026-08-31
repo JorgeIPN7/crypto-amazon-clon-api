@@ -11,19 +11,12 @@ import {
 } from '../../domain/errors/wallet.errors';
 import { WalletId } from '../../domain/value-objects/wallet-id.vo';
 import { WalletRepository } from '../../domain/ports/wallet.repository';
+import { ADMIN_ROLE } from '../../domain/admin-role';
 
 export type AssignWalletInput = {
   ownerId: string;
   ownerRole: string;
 };
-
-/**
- * Rol que ya posee la master. Es un literal y no `USER_ROLES` de `users` a propósito: la regla 2
- * del gate de fronteras prohíbe a `application/` importar nada de otro módulo, y `common` tampoco
- * lo publica —`AuthenticatedUser.role` es un `string` laxo por ese mismo motivo—. El contenido lo
- * garantiza el token; aquí solo se compara.
- */
-const ADMIN_ROLE = 'admin';
 
 /**
  * Alta de la dirección custodiada, **idempotente y sin compensación**.

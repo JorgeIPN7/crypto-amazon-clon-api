@@ -24,10 +24,11 @@ import { TokenId } from '../../domain/value-objects/token-id.vo';
  * que importa este archivo desde el primer día del módulo.
  *
  * El bloque que cierra el archivo, `pageArb` / `limitArb`, es el único que no describe el dominio
- * sino el BORDE HTTP: sus límites salen de `common/dto/pagination.dto.ts` y no de aquí. Como
- * `transferAssetArb`, hoy está compilado y no ejercitado — su cliente es el spec del listado
- * paginado, que todavía no está en el árbol (medido: `find src/modules/wallets/__tests__/application/use-cases -name 'list-*'` no
- * devuelve nada — se mide el SPEC que falta, no un directorio vecino que ya existe).
+ * sino el BORDE HTTP: sus límites salen de `common/dto/pagination.dto.ts` y no de aquí. A
+ * diferencia de `transferAssetArb`, **ya está ejercitado**: su cliente es la propiedad de
+ * `__tests__/application/use-cases/list-wallet-transfers.use-case.spec.ts` (medido: `find
+ * src/modules/wallets/__tests__/application/use-cases -name 'list-*'` devuelve ese archivo y solo
+ * ese; hasta que aterrizó, no devolvía nada).
  */
 
 const HEX_DIGITS = '0123456789abcdefABCDEF';
