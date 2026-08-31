@@ -2442,22 +2442,31 @@ moriría en un 400 con el gas ya pagado.
 
 **Casos acordados** (Tabla H):
 
-| #   | Caso (se vuelve el `it`)                                                                    | Entrada / estado inicial     | Resultado esperado                                    |
-| --- | ------------------------------------------------------------------------------------------- | ---------------------------- | ----------------------------------------------------- |
-| H1  | debería aceptar un hash en minúsculas y conservarlo                                         | `'0x5c504ed4…2060'`          | `value` idéntico a la entrada                         |
-| H2  | debería normalizar a minúsculas un hash en mayúsculas                                       | el mismo en mayúsculas       | `value` = la versión en minúsculas                    |
-| H3  | debería recortar los espacios de los extremos                                               | `'  0x5c504ed4…2060  '`      | `value` sin espacios                                  |
-| H4  | debería aceptar el prefijo `0X` en mayúsculas, normalizándolo                               | `'0X5c504ed4…2060'`          | `value` empieza por `0x`                              |
-| H5  | debería rechazar un hash sin el prefijo `0x`, que es como lo devuelve el proveedor          | 64 hexadecimales pelados     | `InvalidTransactionHashError`; `message` exacto       |
-| H6  | debería rechazar un hash de 63 hexadecimales                                                | `'0x' + 'a'×63`              | `InvalidTransactionHashError`; `message` exacto       |
-| H7  | debería rechazar un hash de 65 hexadecimales                                                | `'0x' + 'a'×65`              | `InvalidTransactionHashError`; `message` exacto       |
-| H8  | debería rechazar un carácter no hexadecimal dentro de los 64                                | `'0x' + 'a'×63 + 'g'`        | `InvalidTransactionHashError`; `message` exacto       |
-| H9  | debería rechazar la cadena vacía                                                            | `''`                         | `message === '"" is not a valid transaction hash'`    |
-| H10 | debería rechazar un hash precedido de basura _(solo falla por el ancla `^`)_                | `'zz0x5c504ed4…2060'`        | `InvalidTransactionHashError`; `message` exacto       |
-| H11 | debería rechazar un hash seguido de basura _(solo falla por el ancla `$`)_                  | `'0x5c504ed4…2060zz'`        | `InvalidTransactionHashError`; `message` exacto       |
-| H12 | debería considerar iguales el mismo hash en mayúsculas y en minúsculas                      | las dos cajas del mismo hash | `equals()` devuelve `true`                            |
-| P1  | debería aceptar cualquier hash de 64 hexadecimales y devolverlo en minúsculas _(propiedad)_ | arbitrario construido        | nunca lanza; `value === entrada.toLowerCase()`        |
-| P2  | debería ser idempotente al normalizar _(propiedad)_                                         | ídem                         | nunca lanza; normalizar dos veces da lo mismo que una |
+| #       | Caso (se vuelve el `it`)                                                                    | Entrada / estado inicial                                          | Resultado esperado                                               |
+| ------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------- |
+| H1      | debería aceptar un hash en minúsculas y conservarlo                                         | `'0x5c504ed4…2060'`                                               | `value` idéntico a la entrada                                    |
+| H2      | debería normalizar a minúsculas un hash en mayúsculas                                       | el mismo en mayúsculas                                            | `value` = la versión en minúsculas                               |
+| H3      | debería recortar los espacios de los extremos                                               | `'  0x5c504ed4…2060  '`                                           | `value` sin espacios                                             |
+| H4      | debería aceptar el prefijo `0X` en mayúsculas, normalizándolo                               | `'0X5c504ed4…2060'`                                               | `value` empieza por `0x`                                         |
+| H5      | debería rechazar un hash sin el prefijo `0x`, que es como lo devuelve el proveedor          | 64 hexadecimales pelados                                          | `InvalidTransactionHashError`; `message` exacto                  |
+| H6      | debería rechazar un hash de 63 hexadecimales                                                | `'0x' + 'a'×63`                                                   | `InvalidTransactionHashError`; `message` exacto                  |
+| H7      | debería rechazar un hash de 65 hexadecimales                                                | `'0x' + 'a'×65`                                                   | `InvalidTransactionHashError`; `message` exacto                  |
+| H8      | debería rechazar un carácter no hexadecimal dentro de los 64                                | `'0x' + 'a'×63 + 'g'`                                             | `InvalidTransactionHashError`; `message` exacto                  |
+| H9      | debería rechazar la cadena vacía                                                            | `''`                                                              | `message === '"" is not a valid transaction hash'`               |
+| H10     | debería rechazar un hash precedido de basura _(solo falla por el ancla `^`)_                | `'zz0x5c504ed4…2060'`                                             | `InvalidTransactionHashError`; `message` exacto                  |
+| H11     | debería rechazar un hash seguido de basura _(solo falla por el ancla `$`)_                  | `'0x5c504ed4…2060zz'`                                             | `InvalidTransactionHashError`; `message` exacto                  |
+| H12     | debería considerar iguales el mismo hash en mayúsculas y en minúsculas                      | las dos cajas del mismo hash                                      | `equals()` devuelve `true`                                       |
+| **H13** | debería llevar en el error el valor CRUDO, no el normalizado                                | `from("  0X" + "A"×63 + "ZZ  ")` — espacios y mayúsculas a la vez | `error.value` es la entrada tal cual, con sus espacios y su caja |
+| P1      | debería aceptar cualquier hash de 64 hexadecimales y devolverlo en minúsculas _(propiedad)_ | arbitrario construido                                             | nunca lanza; `value === entrada.toLowerCase()`                   |
+| P2      | debería ser idempotente al normalizar _(propiedad)_                                         | ídem                                                              | nunca lanza; normalizar dos veces da lo mismo que una            |
+
+⚠️ **H13 se añadió por confirmación tras la revisión, no estaba en la tabla original.** Es el
+hermano del A14 de `ethereum-address.vo.ts` y cierra el mismo hueco: el JSDoc afirma que el error
+lleva el valor CRUDO y ninguno de los doce casos lo fijaba, porque las siete entradas de rechazo
+ya cumplían `raw === raw.trim().toLowerCase()`. Medido: sin H13 el cambio `value` → `normalized`
+deja `113 passed` sin que caiga uno; con H13 da `1 failed, 113 passed` y el único que cae es él.
+Stryker no lo caza —no intercambia identificadores—, así que este caso no aporta score sino la
+única protección que existe sobre esa línea.
 
 **Files:**
 
