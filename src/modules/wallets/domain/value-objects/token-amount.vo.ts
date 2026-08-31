@@ -93,8 +93,13 @@ const MAX_LENGTH = 79;
  * y ningún otro: medido metiendo un `raw.trim()` al principio de `from()` y corriendo la suite
  * entera del módulo — `2 failed, 83 passed`.
  *
- * La asimetría con `TokenId` —que sí aceptará `"0"`, porque el token 0 existe (spec §3.3)— es
- * deliberada. Ese VO todavía no está en el árbol: lo crea la Task 6.
+ * La asimetría con `TokenId` (`token-id.vo.ts`) es deliberada: ese VO **sí acepta `"0"`**, porque
+ * el token 0 existe. Aquí el cero se rechaza en todas sus formas —`0`, `0.0`, `0.000`— porque un
+ * envío de cero quema gas y no mueve nada.
+ *
+ * ⚠️ Una versión anterior decía «ese VO todavía no está en el árbol: lo crea la Task 6», y caducó
+ * en cuanto la Task 6 corrió. Un comentario que apunta a algo futuro nombra el **archivo**, que es
+ * estable y comprobable con un `find`, y no el número de tarea, que deja de ser cierto solo.
  */
 export class TokenAmount extends ValueObject<string> {
   /**
