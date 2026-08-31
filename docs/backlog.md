@@ -402,10 +402,11 @@ suite daba **173 muertos y 0 errores**. Los mutantes son los mismos; lo que camb
 clasificación. Reparto exacto: `ethereum-address.vo.ts` 5, `transaction-hash.vo.ts` 5,
 `address-index.vo.ts` 4.
 
-**La causa, medida y no supuesta.** Ese spec construye seis value objects **a nivel de módulo**,
-fuera de todo `describe`. Un mutante que haga que un `from()` rechace un valor VÁLIDO revienta el
-archivo al importarlo, antes de que corra un solo caso. Verificado cambiando `{40}` por `{41}` en
-la regex de `EthereumAddress`:
+**La causa, medida y no supuesta.** Ese spec construye **siete** value objects, de **cuatro**
+clases distintas, a nivel de módulo y fuera de todo `describe` — contadas con
+`awk '/^describe\(/{exit} /^const .*\.from\(/{print}'` sobre el archivo. Un mutante que haga que
+un `from()` rechace un valor VÁLIDO revienta el archivo al importarlo, antes de que corra un solo
+caso. Verificado cambiando `{40}` por `{41}` en la regex de `EthereumAddress`:
 
 ```
 ● Test suite failed to run
@@ -416,11 +417,16 @@ Tests:       0 total
 
 Sin ningún resultado de test, Stryker no puede decir «lo mató el caso X» y lo bucketea como error.
 
-La asimetría lo confirma sin lugar a dudas: los **tres** VO que ese spec construye a nivel de
-módulo son exactamente los tres que tienen errores; `token-amount.vo.ts` y `token-id.vo.ts`, que
-nunca se construyen ahí, tienen **cero**. `wallet-id.vo.ts` también tiene cero pese a estar en la
-lista, y por una razón que encaja: sus tres mutantes están en la línea del `throw`, no en una
-validación capaz de rechazar un UUID legítimo.
+La asimetría lo confirma: de las cuatro clases construidas a nivel de módulo, **tres** son
+exactamente las que tienen errores, y las dos que nunca se construyen ahí —`token-amount.vo.ts`
+y `token-id.vo.ts`— tienen **cero**.
+
+⚠️ **La cuarta clase construida ahí, `WalletId`, tiene cero errores, y ese contraejemplo es lo que
+da la regla exacta.** Una versión anterior de esta entrada decía «los tres VO que ese spec
+construye», que era falso —son cuatro— y dejaba la implicación equivocada: «construir un value
+object a nivel de módulo ⇒ errores». No es así. Lo que produce el error es que EXISTA un mutante
+capaz de hacer fallar esa construcción, y los tres de `wallet-id.vo.ts` viven en la línea del
+`throw`, no en una validación que pueda rechazar un UUID legítimo.
 
 **Qué NO es.** No es un agujero: el mutante se detecta igual, porque la suite se pone roja y la CI
 con ella. Y no infla el score — Stryker saca esos mutantes del numerador **y** del denominador, así
@@ -444,5 +450,61 @@ seguir ese idioma y el problema no crece.
 **Cómo se sabrá que está hecho.** Cuando `pnpm test:mutation` acotado al dominio de `wallets`
 devuelva `0` en la columna de errores. Hoy devuelve 14, de forma reproducible — medido dos veces
 seguidas con el mismo reparto por archivo.
+
+---
+
+## 18. Las propiedades de `fast-check` no matan mutantes: Stryker nunca las ejecuta
+
+**Qué pasa.** Un test escrito con `fcTest.prop` de `@fast-check/jest` **no aporta ni un mutante
+muerto** al gate de mutación, por bien escrito que esté. Stryker lo cuenta como cobertura y
+después no lo ejecuta contra ningún mutante.
+
+**La causa, medida y no supuesta.** `stryker.config.mjs` usa `coverageAnalysis: 'perTest'`, que
+empareja tests por NOMBRE entre la corrida seca y la del mutante. Y `@fast-check/jest` mete la
+semilla DENTRO del nombre. La salida del propio auditor lo enseña:
+
+```
+~ WalletTransfer aplanado del activo (property-based) debería aplanar cualquier clase de activo
+  en sus cuatro columnas (with seed=399077411) [line 45] (covered 16)
+```
+
+`covered 16`, `killed 0`. En la corrida de cada mutante fast-check elige otra semilla, el nombre
+cambia, Stryker no encuentra ese test y no lo ejecuta — así que el mutante sale **vivo**.
+
+**Verificado por contradicción, que es lo que lo cierra.** El mutante
+`fungible: () => undefined` de `wallet-transfer.entity.ts`:
+
+```
+Stryker           →  [Survived] ArrowFunction   (con la propiedad en la suite)
+jest, a mano      →  1 failed  ← y el que cae ES la propiedad
+```
+
+La propiedad mata el mutante. Stryker dice que sobrevive. Lo único que las separa es que Stryker
+no llegó a correrla.
+
+**Qué NO es.** No es que las propiedades no sirvan: siguen explorando valores que ningún caso
+puntual cubre y siguen poniendo la CI roja cuando encuentran un contraejemplo. Y no es un
+agujero que deje pasar código roto por sí solo.
+
+**Qué SÍ es.** Que el gate de mutación mide MENOS de lo que parece: el score sale entero del
+poder de muerte de los casos puntuales. Un módulo que confíe una invariante solo a una propiedad
+la verá aparecer como superviviente y no sabrá por qué — que es exactamente lo que costó
+diagnosticar aquí. ⚠️ Alcanza a **todo el repo**, no solo a `wallets`: cualquier `fcTest.prop`
+del árbol está en la misma situación.
+
+**Criterio ya decidido.** Se acepta y se documenta; no se fija la semilla. Fijarla
+(`fc.configureGlobal({ seed })`) estabilizaría el nombre y devolvería el poder de muerte, pero a
+cambio la suite exploraría **el mismo** conjunto de valores en cada ejecución, que es justo lo
+que una propiedad viene a evitar. Ningún test del árbol la fija hoy y no se empieza aquí.
+
+La regla práctica, que es lo que hay que llevarse: **cuando una rama del código solo la mira una
+propiedad, hace falta además un caso puntual que la ancle.** No es duplicar: la propiedad explora
+y el caso ancla. Las dos ramas intermedias del aplanado de `wallet-transfer.entity.ts` son el
+ejemplo trabajado — con la propiedad sola, cuatro supervivientes; con dos casos puntuales al
+lado, 33 muertos y cero.
+
+**Cómo se sabrá que está hecho.** Cuando la salida de `pnpm test:mutation` muestre un `fcTest.prop`
+con `killed` distinto de cero, o cuando `@fast-check/jest` deje de interpolar la semilla en el
+nombre del test. Hoy ninguna de las dos cosas ocurre.
 
 ---
