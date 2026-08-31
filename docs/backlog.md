@@ -393,3 +393,56 @@ entrada de direcciones que no pase por un DTO. Esta entrada existe para que quie
 la garantía no está en el dominio.
 
 ---
+
+## 17. Catorce mutantes del dominio de `wallets` salen como «error» y no como «muertos»
+
+**Qué pasa.** Desde que existe `wallet.entity.spec.ts`, `pnpm test:mutation --mutate
+"src/modules/wallets/domain/**/*.ts"` reporta **214 muertos y 14 con error**, cuando antes de esa
+suite daba **173 muertos y 0 errores**. Los mutantes son los mismos; lo que cambió es su
+clasificación. Reparto exacto: `ethereum-address.vo.ts` 5, `transaction-hash.vo.ts` 5,
+`address-index.vo.ts` 4.
+
+**La causa, medida y no supuesta.** Ese spec construye seis value objects **a nivel de módulo**,
+fuera de todo `describe`. Un mutante que haga que un `from()` rechace un valor VÁLIDO revienta el
+archivo al importarlo, antes de que corra un solo caso. Verificado cambiando `{40}` por `{41}` en
+la regex de `EthereumAddress`:
+
+```
+● Test suite failed to run
+  InvalidEthereumAddressError: "0x4f3e…b113" is not a valid Ethereum address
+Test Suites: 1 failed, 1 total
+Tests:       0 total
+```
+
+Sin ningún resultado de test, Stryker no puede decir «lo mató el caso X» y lo bucketea como error.
+
+La asimetría lo confirma sin lugar a dudas: los **tres** VO que ese spec construye a nivel de
+módulo son exactamente los tres que tienen errores; `token-amount.vo.ts` y `token-id.vo.ts`, que
+nunca se construyen ahí, tienen **cero**. `wallet-id.vo.ts` también tiene cero pese a estar en la
+lista, y por una razón que encaja: sus tres mutantes están en la línea del `throw`, no en una
+validación capaz de rechazar un UUID legítimo.
+
+**Qué NO es.** No es un agujero: el mutante se detecta igual, porque la suite se pone roja y la CI
+con ella. Y no infla el score — Stryker saca esos mutantes del numerador **y** del denominador, así
+que el 100 % que reporta es honesto y el gate `break: 85` no se ve afectado.
+
+**Qué SÍ es, dicho sin adornos.** Una pérdida de señal del 6 % de los mutantes del módulo (14 de
+228). De esos catorce ya no se sabe qué caso los mata, así que si un refactor futuro dejara a uno
+sin cobertura real, caería en el cubo de «error» en lugar de aparecer como superviviente — que es
+justo donde se mira.
+
+**Criterio ya decidido.** Se acepta por ahora y **no** se reestructura el spec. Construir los VO
+de forma perezosa —una función por constante, o un `beforeAll`— arregla la clasificación pero
+empeora la legibilidad en cada punto de uso, y es una decisión de FORMA que afecta a cómo escribe
+sus specs todo el módulo, no solo a este archivo. Se paga una vez y para todos, o no se paga.
+
+⚠️ **El precedente limpio ya existe dentro del propio módulo**: `transfer-asset.spec.ts` guarda
+cadenas crudas a nivel de módulo y construye los value objects dentro de cada caso. Ese archivo
+aporta 61 mutantes y **cero errores**. Quien escriba los specs de las tareas siguientes puede
+seguir ese idioma y el problema no crece.
+
+**Cómo se sabrá que está hecho.** Cuando `pnpm test:mutation` acotado al dominio de `wallets`
+devuelva `0` en la columna de errores. Hoy devuelve 14, de forma reproducible — medido dos veces
+seguidas con el mismo reparto por archivo.
+
+---

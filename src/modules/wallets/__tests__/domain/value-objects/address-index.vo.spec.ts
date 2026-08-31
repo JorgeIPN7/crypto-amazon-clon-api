@@ -81,7 +81,7 @@ describe('AddressIndex', () => {
   });
 
   describe('from() (property-based)', () => {
-    // `addressIndexArb` ya existía —nace en la Task 1— y es exactamente
+    // `addressIndexArb` ya existía en `__tests__/helpers/arbitraries.ts` y es exactamente
     // `fc.integer({ min: 0, max: 2_147_483_647 })`, es decir el rango que este VO acepta. Se
     // IMPORTA en lugar de escribir aquí un `fc.integer` equivalente: si mañana el tope cambiara,
     // una copia local dejaría la propiedad verificando el rango viejo, en verde y en silencio.
