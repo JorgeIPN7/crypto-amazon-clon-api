@@ -1412,23 +1412,37 @@ puede importar `@noble/hashes` (regla 1 del gate) y keccak256 no está en `node:
 
 **Casos acordados** (Tabla A):
 
-| #   | Caso (se vuelve el `it`)                                                                         | Entrada / estado inicial                           | Resultado esperado                                             |
-| --- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------- | -------------------------------------------------------------- |
-| A1  | debería aceptar una dirección en minúsculas y conservarla                                        | `'0x742d35cc…f44e'`                                | `value` idéntico a la entrada                                  |
-| A2  | debería normalizar a minúsculas una dirección con checksum EIP-55                                | `'0x742d35Cc6634C0532925a3b844Bc454e4438f44e'`     | `value` = la misma en minúsculas                               |
-| A3  | debería recortar los espacios de los extremos                                                    | `'  0x742d35cc…f44e  '`                            | `value` = la dirección sin espacios                            |
-| A4  | debería aceptar el prefijo `0X` en mayúsculas, normalizándolo                                    | `'0X742d35cc…f44e'`                                | `value` empieza por `0x`                                       |
-| A5  | debería aceptar una dirección con el checksum EIP-55 incorrecto                                  | `'0x742D35cc…f44e'` (caja distinta de la canónica) | no lanza; `value` = la versión en minúsculas                   |
-| A6  | debería rechazar una dirección sin el prefijo `0x`                                               | 40 hexadecimales pelados                           | `InvalidEthereumAddressError`; `message` exacto; `value` crudo |
-| A7  | debería rechazar una dirección de 39 hexadecimales                                               | `'0x' + 'a'×39`                                    | `InvalidEthereumAddressError`; `message` exacto                |
-| A8  | debería rechazar una dirección de 41 hexadecimales                                               | `'0x' + 'a'×41`                                    | `InvalidEthereumAddressError`; `message` exacto                |
-| A9  | debería rechazar un carácter no hexadecimal dentro de los 40                                     | `'0x' + 'a'×39 + 'g'`                              | `InvalidEthereumAddressError`; `message` exacto                |
-| A10 | debería rechazar la cadena vacía                                                                 | `''`                                               | `message === '"" is not a valid Ethereum address'`             |
-| A11 | debería rechazar una dirección precedida de basura _(solo falla por el ancla `^`)_               | `'zz0x742d35cc…f44e'`                              | `InvalidEthereumAddressError`; `message` exacto                |
-| A12 | debería rechazar una dirección seguida de basura _(solo falla por el ancla `$`)_                 | `'0x742d35cc…f44ezz'`                              | `InvalidEthereumAddressError`; `message` exacto                |
-| A13 | debería considerar iguales la misma dirección en EIP-55 y en minúsculas                          | las dos formas de la misma dirección               | `equals()` devuelve `true`                                     |
-| P1  | debería aceptar cualquier dirección de 40 hexadecimales y devolverla en minúsculas _(propiedad)_ | arbitrario `0x` + 40 hex con cajas mezcladas       | nunca lanza; `value === entrada.toLowerCase()`                 |
-| P2  | debería ser idempotente al normalizar _(propiedad)_                                              | ídem                                               | nunca lanza; normalizar dos veces da lo mismo que una          |
+| #       | Caso (se vuelve el `it`)                                                                         | Entrada / estado inicial                           | Resultado esperado                                               |
+| ------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------- | ---------------------------------------------------------------- |
+| A1      | debería aceptar una dirección en minúsculas y conservarla                                        | `'0x742d35cc…f44e'`                                | `value` idéntico a la entrada                                    |
+| A2      | debería normalizar a minúsculas una dirección con checksum EIP-55                                | `'0x742d35Cc6634C0532925a3b844Bc454e4438f44e'`     | `value` = la misma en minúsculas                                 |
+| A3      | debería recortar los espacios de los extremos                                                    | `'  0x742d35cc…f44e  '`                            | `value` = la dirección sin espacios                              |
+| A4      | debería aceptar el prefijo `0X` en mayúsculas, normalizándolo                                    | `'0X742d35cc…f44e'`                                | `value` empieza por `0x`                                         |
+| A5      | debería aceptar una dirección con el checksum EIP-55 incorrecto                                  | `'0x742D35cc…f44e'` (caja distinta de la canónica) | no lanza; `value` = la versión en minúsculas                     |
+| A6      | debería rechazar una dirección sin el prefijo `0x`                                               | 40 hexadecimales pelados                           | `InvalidEthereumAddressError`; `message` exacto; `value` crudo   |
+| A7      | debería rechazar una dirección de 39 hexadecimales                                               | `'0x' + 'a'×39`                                    | `InvalidEthereumAddressError`; `message` exacto                  |
+| A8      | debería rechazar una dirección de 41 hexadecimales                                               | `'0x' + 'a'×41`                                    | `InvalidEthereumAddressError`; `message` exacto                  |
+| A9      | debería rechazar un carácter no hexadecimal dentro de los 40                                     | `'0x' + 'a'×39 + 'g'`                              | `InvalidEthereumAddressError`; `message` exacto                  |
+| A10     | debería rechazar la cadena vacía                                                                 | `''`                                               | `message === '"" is not a valid Ethereum address'`               |
+| A11     | debería rechazar una dirección precedida de basura _(solo falla por el ancla `^`)_               | `'zz0x742d35cc…f44e'`                              | `InvalidEthereumAddressError`; `message` exacto                  |
+| A12     | debería rechazar una dirección seguida de basura _(solo falla por el ancla `$`)_                 | `'0x742d35cc…f44ezz'`                              | `InvalidEthereumAddressError`; `message` exacto                  |
+| A13     | debería considerar iguales la misma dirección en EIP-55 y en minúsculas                          | las dos formas de la misma dirección               | `equals()` devuelve `true`                                       |
+| **A14** | debería llevar en el error el valor CRUDO, no el normalizado                                     | `from("  0xZZ…  ")` con espacios y mayúsculas      | `error.value` es la entrada tal cual, con sus espacios y su caja |
+| P1      | debería aceptar cualquier dirección de 40 hexadecimales y devolverla en minúsculas _(propiedad)_ | arbitrario `0x` + 40 hex con cajas mezcladas       | nunca lanza; `value === entrada.toLowerCase()`                   |
+| P2      | debería ser idempotente al normalizar _(propiedad)_                                              | ídem                                               | nunca lanza; normalizar dos veces da lo mismo que una            |
+
+⚠️ **A14 se añadió por confirmación JIT tras la revisión, no estaba en la tabla original.** Cierra
+un hueco que el gate de mutación NO puede ver: el JSDoc de `from()` afirma que el error lleva el
+valor CRUDO, y ninguno de los quince casos anteriores lo fijaba —todas sus entradas de rechazo
+tenían crudo y normalizado idénticos, así que cambiar `value` por `normalized` dejaba la suite en
+verde—. Verificado rompiéndolo: con ese cambio A14 es el ÚNICO que cae (`1 failed, 58 passed`).
+
+Stryker no genera el mutante «cambia un identificador por otro del mismo ámbito», así que el score
+de mutación es idéntico con y sin A14 (48/48): este caso no aporta score, aporta la única
+protección que existe sobre esa línea del JSDoc.
+
+⚠️ **El bloque de código del Step 1 de abajo reproduce el spec SIN A14**, tal como se acordó
+originalmente. El árbol lleva los dieciséis casos.
 
 **Files:**
 
