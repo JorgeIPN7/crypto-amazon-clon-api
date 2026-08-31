@@ -37,14 +37,19 @@ describe('SYSTEM_ACTORS', () => {
   });
 
   describe('el catálogo', () => {
-    it('debería nombrar los tres orígenes automáticos que hoy escriben filas', () => {
+    it('debería nombrar los cuatro orígenes automáticos que hoy escriben filas', () => {
       // Arrange & Act
       const names = Object.keys(SYSTEM_ACTORS).sort();
 
       // Assert
       // Cerrado a propósito: un origen nuevo añade su constante Y esta lista, en el mismo
       // cambio. Sin la lista, un actor añadido a medias pasaría inadvertido.
-      expect(names).toEqual(['ADMIN_SEED', 'OUTBOX_RELAY', 'PUBLIC_REGISTRATION']);
+      expect(names).toEqual([
+        'ACTIVATION_RECONCILIATION',
+        'ADMIN_SEED',
+        'OUTBOX_RELAY',
+        'PUBLIC_REGISTRATION',
+      ]);
     });
   });
 });

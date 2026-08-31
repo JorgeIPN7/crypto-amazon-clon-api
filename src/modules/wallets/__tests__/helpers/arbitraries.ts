@@ -23,9 +23,11 @@ import { TokenId } from '../../domain/value-objects/token-id.vo';
  * `../../domain/transfer-asset`, habría tumbado con `Cannot find module` a `wallet.errors.spec.ts`,
  * que importa este archivo desde el primer día del módulo.
  *
- * ⚠️ Todavía faltan por llegar `pageArb` / `limitArb`, que acompañarán al listado paginado
- * (`list-wallet-transfers.use-case.spec.ts`, aún no en el árbol). Esos dos no dependen de nada:
- * están pendientes por calendario, no por un `import`.
+ * El bloque que cierra el archivo, `pageArb` / `limitArb`, es el único que no describe el dominio
+ * sino el BORDE HTTP: sus límites salen de `common/dto/pagination.dto.ts` y no de aquí. Como
+ * `transferAssetArb`, hoy está compilado y no ejercitado — su cliente es el spec del listado
+ * paginado, que todavía no está en el árbol (medido: `find src/modules/wallets/__tests__/application/use-cases -name 'list-*'` no
+ * devuelve nada — se mide el SPEC que falta, no un directorio vecino que ya existe).
  */
 
 const HEX_DIGITS = '0123456789abcdefABCDEF';
@@ -179,3 +181,22 @@ export const transferAssetArb: fc.Arbitrary<TransferAssetSample> = fc.oneof(
   nftAssetArb,
   multiTokenAssetArb,
 );
+
+/**
+ * Páginas que el borde HTTP deja pasar. **Medido en `src/common/dto/pagination.dto.ts`**, no
+ * supuesto: `page` lleva `@Min(1)` y **ningún `@Max`**, así que el `1` de abajo es del contrato y
+ * el tope de un millón es de este generador — está para que el `(page - 1) * limit` que el
+ * adaptador calcula se quede lejos de `Number.MAX_SAFE_INTEGER` sin dejar de ser una página que un
+ * cliente podría pedir de verdad.
+ *
+ * Generar por debajo de 1 probaría una entrada que el DTO rechaza con un 400, y el caso de uso no
+ * es quien la rechaza: la propiedad culparía al caso de uso de un contrato que no es suyo.
+ */
+export const pageArb = fc.integer({ min: 1, max: 1_000_000 });
+
+/**
+ * Tamaños de página que el borde HTTP deja pasar: `@Min(1)` y `@Max(100)`, **los dos** medidos en
+ * `src/common/dto/pagination.dto.ts`. Aquí el tope sí es del contrato, a diferencia del de
+ * `pageArb`.
+ */
+export const limitArb = fc.integer({ min: 1, max: 100 });

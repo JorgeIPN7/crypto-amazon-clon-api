@@ -79,21 +79,25 @@ export type SendCommand = {
  * dirección es la fila guardada**, nunca una rederivación.
  */
 /**
- * ⚠️ **Los tres métodos indexados piden value objects que `Wallet` NO publica**, y conviene
- * saberlo antes de escribir los casos de uso en vez de tres tareas más tarde. Medido: los únicos
- * miembros públicos de `entities/wallet.entity.ts` son `status`, `activationTxId`, `canSend`,
- * los dos mutadores, las dos aserciones y `toSnapshot()` — no hay `get addressIndex()` ni
- * `get address()`.
+ * ⚠️ **Los tres métodos indexados piden value objects, y `Wallet` los publica tal cual**: su
+ * constructor privado declara `ownerId`, `ownerAddress`, `addressIndex` y `address` como
+ * **parameter properties públicas** (`readonly`, sin modificador de acceso), así que
+ * `wallet.addressIndex` y `wallet.address` compilan desde `application/` y se pasan directos.
+ * Medido: `assign-wallet.use-case.spec.ts` lee `wallet.addressIndex.value` y
+ * `wallet.address.value`, y `tsc --noEmit` sale limpio.
  *
- * La consecuencia es que el caso de uso sacará ambos de `wallet.toSnapshot()`, que los da como
- * `number` y `string`, y tendrá que reconstruir `AddressIndex.from(...)` /
- * `EthereumAddress.from(...)` dentro de `application/` — reejecutando una validación cuyos fallos
- * son inalcanzables desde la API y saldrían como un 500.
+ * ⚠️ **Una versión anterior de este bloque afirmaba lo contrario** —que los únicos miembros
+ * públicos eran `status`, `activationTxId`, `canSend`, los mutadores, las aserciones y
+ * `toSnapshot()`, y que el caso de uso tendría que reconstruir los VO desde el snapshot—.
+ * Era falso, y la causa vale más que el dato: se midió con un `grep` de `^  (get |readonly )`,
+ * que ancla a DOS espacios de indentación y por eso no ve las parameter properties, escritas a
+ * cuatro dentro del constructor. Una medición parcial presentada como total, que es justo la
+ * lección que este ciclo lleva escrita. El grep que sí las ve es
+ * `grep -n "readonly " src/modules/wallets/domain/entities/wallet.entity.ts`.
  *
- * **No está roto y las dos superficies están congeladas.** Si ese ida y vuelta pesa, la salida es
- * añadir dos getters a `Wallet`, nunca aflojar la firma de este puerto a `number`/`string`: el
- * índice y la dirección son justo los dos datos que no deben viajar sin validar hasta una llamada
- * que cobra gas.
+ * Que el puerto pida VO y no `number`/`string` sigue siendo lo correcto: el índice y la
+ * dirección son justo los dos datos que no deben viajar sin validar hasta una llamada que
+ * cobra gas.
  */
 export abstract class CustodialAddressGateway {
   abstract masterAddress(): EthereumAddress;
