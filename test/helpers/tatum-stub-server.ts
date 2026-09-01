@@ -158,6 +158,32 @@ export class TatumStubServer {
     return this.missed;
   }
 
+  /**
+   * La QUINTA capa, simétrica de `unstubbed`: respuestas que el guion programó y la app nunca pidió.
+   *
+   * Las cuatro capas que documenta la cabecera cubren «la app llamó a una ruta que nadie programó».
+   * Esta cubre lo contrario, que es igual de traicionero: un caso que programa un desenlace que el
+   * código ha dejado de consultar sigue pasando en verde, porque `reset()` descarta la cola en
+   * silencio y nada lo dice.
+   *
+   * ⚠️ **Se expone pero NO se afirma en los `afterEach`, y el motivo está medido**: hacerlo pone
+   * rojos casi todos los casos de `wallets.e2e-spec.ts`. La razón es legítima y no un descuido de
+   * los tests — los casos que responden 401, 403 o 409 cortan ANTES de llamar al proveedor, así que
+   * la respuesta que su montaje compartido programó se queda sin consumir por diseño.
+   *
+   * O sea que la quinta capa no cuesta «una línea»: exigiría que cada caso programe exactamente lo
+   * que va a consumir, y eso es un cambio en el contrato de todos ellos. Queda el getter, que sirve
+   * para depurar un caso concreto, y queda dicho por qué no es una aserción global.
+   *
+   * Hoy tampoco hay agujero real: cada omisión de ese tipo tumba otro caso — quitar la
+   * reconciliación pone rojo el 409 de «el proveedor ya la da por activada».
+   */
+  get pending(): readonly string[] {
+    return [...this.queues.entries()]
+      .filter(([, queue]) => queue.length > 0)
+      .map(([key, queue]) => key + ' (' + queue.length + ' sin consumir)');
+  }
+
   reset(): void {
     this.releaseHeld();
     this.queues.clear();

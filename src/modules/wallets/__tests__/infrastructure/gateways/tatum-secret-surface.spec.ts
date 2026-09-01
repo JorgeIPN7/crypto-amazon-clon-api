@@ -284,6 +284,37 @@ const leakingSurfaces = (value: unknown): string[] => {
     ['pino', logLine(value)],
   ];
   return surfaces
-    .filter(([, rendered]) => SECRETS.some((secret) => rendered.includes(secret)))
+    .filter(([, rendered]) => SECRETS.some((secret) => leaks(rendered, secret)))
     .map(([surface]) => surface);
+};
+
+/**
+ * ⚠️ **Busca FRAGMENTOS, no solo el secreto entero, y ese es el punto del helper.**
+ *
+ * Una versión anterior hacía `rendered.includes(secret)` a secas, y ese es exactamente el punto
+ * ciego que este ciclo ya se comió una vez: `@noble/curves` mete en su mensaje de error un
+ * fragmento de la clave —`got non-hex character "az" at index 62`— y un centinela que solo mira el
+ * secreto completo lo deja pasar en verde.
+ *
+ * La ventana es de 16 caracteres porque hay que elegir entre dos fallos opuestos: demasiado corta
+ * y salta con cualquier palabra —un secreto hexadecimal contiene `ab`, `de`, `f0`…—, demasiado
+ * larga y vuelve a no ver la fuga parcial. 16 sobre un hexadecimal son 64 bits: la probabilidad de
+ * que aparezcan por azar en un mensaje es despreciable, y sigue cazando una fuga de un octavo de
+ * la clave.
+ *
+ * ⚠️ Lo que NO cubre, dicho en vez de prometido: una fuga de menos de 16 caracteres —como el `"az"`
+ * de dos del ejemplo— sigue siendo invisible aquí. Contra eso, la guarda es otra y vive en
+ * `master-key-startup.check.spec.ts`: comparar el mensaje de error con IGUALDAD EXACTA, que rompe
+ * ante cualquier interpolación, de lo que sea. Las dos son complementarias y ninguna sustituye a
+ * la otra.
+ */
+const leaks = (rendered: string, secret: string): boolean => {
+  const WINDOW = 16;
+  const body = secret.startsWith('0x') ? secret.slice(2) : secret;
+  for (let i = 0; i + WINDOW <= body.length; i++) {
+    if (rendered.includes(body.slice(i, i + WINDOW))) {
+      return true;
+    }
+  }
+  return false;
 };

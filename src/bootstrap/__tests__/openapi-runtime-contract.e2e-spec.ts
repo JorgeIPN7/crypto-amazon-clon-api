@@ -159,8 +159,13 @@ describe('contrato OpenAPI en ejecución', () => {
     // que el guion mandó una llamada que nadie previó, y el 418 con el que el stub contestó no
     // representa nada del proveedor. Sin esto, un escenario podría estar validando contra el
     // esquema una respuesta de error que se ganó el propio doble.
-    expect(stub?.unstubbed ?? []).toEqual([]);
+    // ⚠️ Se copia la lista y se PARA el stub antes de afirmar. Con la aserción delante, un fallo
+    // deja el `stop()` sin ejecutar y el puerto fijo ocupado: la siguiente suite E2E que arranque
+    // el stub —misma corrida, `maxWorkers: 1`— muere con EADDRINUSE y el rojo habla del puerto en
+    // vez del contrato. Es el patrón que `wallets.e2e-spec.ts` ya usa en su `afterEach`.
+    const missed = [...(stub?.unstubbed ?? [])];
     await stub?.stop();
+    expect(missed).toEqual([]);
   });
 
   const get = (context: Context, path: string, token?: string) => {

@@ -87,6 +87,22 @@ describe('Wallets (e2e)', () => {
     ({ app, prefix } = await createTestApp());
     dataSource = app.get(DataSource);
 
+    // ⚠️ **El control de seguridad de la suite, y va aquí ANTES de que corra un solo caso.**
+    // Cinco de los casos de abajo transfieren, y si la configuración resuelta apuntara a la API
+    // real moverían dinero de verdad. `test/setup-env.ts` fija la URL a loopback, pero con `??=`,
+    // que respeta a propósito un valor del shell: quien exporte `TATUM_API_URL` apuntando a Tatum
+    // —el montaje de la prueba de humo hecho con `export`— se la llevaría puesta.
+    //
+    // Afirmar aquí y no solo en un `it` es la diferencia entre abortar y enterarse tarde: el
+    // `describe` que lo reporta con nombre legible es el ÚLTIMO del archivo.
+    const resolvedApiUrl = app.get(ConfigService).getOrThrow<WalletsConfig>('wallets').apiUrl;
+    if (!resolvedApiUrl.startsWith('http://127.0.0.1:')) {
+      throw new Error(
+        `La configuración del proveedor no apunta a loopback (${resolvedApiUrl}): se aborta la ` +
+          `suite antes de que ningún caso pueda transferir contra la API real.`,
+      );
+    }
+
     // Arranque limpio de las cuentas y UN solo login por cuenta para toda la suite: el
     // presupuesto de `@Throttle` de auth es 10/min y esta suite hace muchas peticiones.
     await dataSource.query('TRUNCATE TABLE wallet_transfers');
@@ -122,8 +138,12 @@ describe('Wallets (e2e)', () => {
     await dataSource.query('TRUNCATE TABLE wallets');
     // ⚠️ Los dos endpoints que mueven gas o dinero —`POST /wallets/me/activation` y
     // `POST /wallets/me/transfers`— llevan su propio `@Throttle({ limit: 10, ttl: 60_000 })`, y
-    // `ThrottlerGuard` cuenta por clase Y handler. Esta suite hace más de diez llamadas a cada
-    // uno contra la MISMA app, así que sin el reset se autoenvenena: los últimos casos reciben
+    // `ThrottlerGuard` cuenta por clase Y handler.
+    //
+    // ⚠️ **Hoy el reset todavía NO es load-bearing, y conviene decirlo en vez de exagerarlo**: la
+    // suite hace 8 llamadas a la activación y 7 a la transferencia, las dos por debajo del límite
+    // de 10. Se llama igual porque el presupuesto es por MINUTO y la suite entera comparte una sola
+    // app: en cuanto alguien añada tres casos, sin el reset los últimos reciben
     // 429 donde esperan 200 o 202, y el rojo habla del presupuesto de peticiones del test y no
     // del código bajo prueba. Ningún `describe` de aquí mide el 429, así que vaciar el contador
     // no borra nada que se esté midiendo.
@@ -591,6 +611,16 @@ describe('Wallets (e2e)', () => {
   });
 
   describe('configuración resuelta', () => {
+    // ⚠️ **La aserción de verdad vive en el `beforeAll` de la suite, no aquí.** Este `describe` es
+    // el ÚLTIMO del archivo, así que si el control viviera solo en este `it` se ejecutaría DESPUÉS
+    // de los cinco casos que transfieren: se enteraría del problema cuando el dinero ya se movió.
+    //
+    // `test/setup-env.ts` usa `??=`, que respeta a propósito un valor del shell — así que alguien
+    // que exporte `TATUM_API_URL` apuntando a la API real (justo el montaje de la prueba de humo
+    // hecha con `export` en vez de con un `.env.local`) haría salir las transferencias de verdad.
+    //
+    // Este caso se queda porque es el que REPORTA con un nombre legible; el que PROTEGE es el del
+    // arranque.
     it('debería resolver la configuración del proveedor contra loopback', () => {
       // Arrange
       const config = app.get(ConfigService).getOrThrow<WalletsConfig>('wallets');
