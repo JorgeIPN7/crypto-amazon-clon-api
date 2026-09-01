@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
 // ⚠️ `TransferPage` es un DATO que acompaña al puerto, así que su forma natural sería el `type`
-// inline —`import { WalletTransferRepository, type TransferPage }`—, y aquí no lo lleva porque su
-// nombre todavía NO está en la lista cerrada del selector de `eslint.config.mjs`. Medido
+// inline —`import { WalletTransferRepository, type TransferPage }`—. Su nombre YA está en la lista
+// cerrada del selector de `eslint.config.mjs`, que pasó de siete a once nombres al cerrarse el
+// ciclo; se deja como VALOR porque cambiarlo ahora no aporta nada y la forma de valor es igual de
+// correcta. Cuando el nombre no estaba, la medición era:
 // escribiéndolo así y corriendo `npx eslint` sobre este archivo: sale `error` de
 // `no-restricted-syntax` en la columna del specifier, con el mensaje que manda añadir el nombre a
 // esa lista. La salida mientras tanto es importarlo como VALOR, que es la que prescribe el JSDoc

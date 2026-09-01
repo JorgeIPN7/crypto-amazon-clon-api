@@ -85,9 +85,11 @@ export type ActivateWalletInput = {
  *
  * ⚠️ **El desenlace de `save` se ignora a propósito.** `'owner-conflict'` es el `23505` del índice
  * único de `user_id` entre dos ALTAS simultáneas, y aquí la fila ya existe y ya lleva ese
- * `user_id`: no hay nadie con quien chocar. Es una afirmación sobre el adaptador, que todavía **no
- * existe** —medido: `find src/modules/wallets/infrastructure` responde `No such file or
- * directory`—, así que describe el reparto previsto y no algo comprobado contra PostgreSQL.
+ * `user_id`: no hay nadie con quien chocar.
+ *
+ * Y eso **ya está comprobado contra PostgreSQL**, no previsto: `wallet.typeorm.repository.ts`
+ * traduce el choque de `idx_wallets_user_id` a `'owner-conflict'` y LANZA en los otros dos
+ * índices y en el `CHECK`, y su E2E provoca los cuatro contra la base real.
  */
 @Injectable()
 export class ActivateWalletUseCase {

@@ -32,13 +32,14 @@ const ACTOR = '5b7c2d4e-9a1f-4c3b-8e6d-0f2a4b6c8d1e';
  * restricción que llega en `driverError.constraint`—, y un doble lo sustituiría por lo que uno
  * cree que hace.
  *
- * El repositorio se construye con `new` y no resolviendo `WalletRepository` del contenedor, y eso
- * seguirá siendo lo correcto cuando `src/modules/wallets/wallets.module.ts` lo registre: el sujeto
- * de este spec es el adaptador, no el wiring. La frase se escribe así —y no como «el binding
- * todavía no existe»— para que no quede INVERTIDA el día que el módulo aterrice. Que el motivo no
- * es la falta de módulo se comprueba en el precedente: `orders.module.ts` existe desde hace
- * ciclos y `order.typeorm.repository.e2e-spec.ts` sigue construyendo su repositorio con
- * `new OrderTypeOrmRepository(...)` en el `beforeAll`.
+ * El repositorio se construye con `new` y no resolviendo `WalletRepository` del contenedor, y sigue
+ * siendo lo correcto ahora que `src/modules/wallets/wallets.module.ts` lo registra (2026-08-31): el
+ * sujeto de este spec es el adaptador, no el wiring. La frase se escribió así —y no como «el
+ * binding todavía no existe»— para que no quedara INVERTIDA el día que el módulo aterrizara, y
+ * aterrizó. Que el motivo no es la falta de módulo se comprueba en el precedente:
+ * `orders.module.ts` existe desde hace ciclos y `order.typeorm.repository.e2e-spec.ts` sigue
+ * construyendo su repositorio con `new OrderTypeOrmRepository(...)` en el `beforeAll`. Quien sí
+ * comprueba el binding es `wallets.module.e2e-spec.ts`.
  *
  * ⚠️ **Esta capa no la audita la mutación** (`stryker.config.mjs` no muta `infrastructure/`), así
  * que el único control de estos casos son ellos mismos. Por eso cada uno de los cuatro de

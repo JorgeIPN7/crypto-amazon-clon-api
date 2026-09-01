@@ -61,8 +61,14 @@ export type RecordedSendCommand = {
  *   tres campos —`from`, `recipient`, `asset`— y ninguno es la clave privada; el JSDoc del propio
  *   puerto escribe que «no aparece aquí y no puede aparecer», y quien la lee es el adaptador. El
  *   doble que SÍ la verá es el stub HTTP del E2E, que guarda cuerpos con `fromPrivateKey` dentro, y
- *   ese todavía no está en el árbol (medido: `find src/modules/wallets -name '*stub*'` no devuelve
- *   nada). Decir que este fake «ve la clave privada» sería falso.
+ *   ese stub existe y vive en `test/helpers/tatum-stub-server.ts` —fuera de `src/`, porque lo
+ *   consumen dos suites de sitios distintos—, y enmascara la clave al guardar lo que recibe.
+ *   Decir que este fake «ve la clave privada» sigue siendo falso.
+ *
+ *   ⚠️ Aquí ponía «ese todavía no está en el árbol», con `find src/modules/wallets -name '*stub*'`
+ *   como medición. Ese `find` sigue sin devolver nada porque está acotado a `src/modules/wallets`
+ *   y el stub vive en `test/`: la medición era CIERTA y la conclusión FALSA. Es el mismo `find`
+ *   que se caza a sí mismo que ya documenta `wallet-transfer.entity.ts`.
  * - **Lo que la proyección compra es que siga siendo así.** Guardar el mandato entero guarda todo
  *   lo que ese tipo LLEGUE a tener; una lista nombrada guarda solo lo que hoy se nombra, y un campo
  *   nuevo hay que añadirlo a mano. Falla en cerrado, igual que la lista cerrada del selector de

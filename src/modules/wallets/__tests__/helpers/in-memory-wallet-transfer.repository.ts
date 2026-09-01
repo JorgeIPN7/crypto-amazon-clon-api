@@ -31,9 +31,11 @@ import type {
  * `limit` —el vocabulario del cliente— y quien traduce a desplazamiento es quien consulta; el
  * JSDoc del propio puerto ya escribe que ese coste se paga aquí, y que es deliberado.
  *
- * ⚠️ **El orden es `createdAt` DESCENDENTE, y es una SUPOSICIÓN sobre un adaptador que todavía no
- * existe** —medido: `find src/modules/wallets/infrastructure` responde `No such file or
- * directory`—. Se elige así, y no «orden de inserción», por dos indicios y ninguna medida: el único
+ * ⚠️ **El orden es `createdAt` DESCENDENTE con desempate por `id`, y ya NO es una suposición: es
+ * lo que hace el adaptador real.** `wallet-transfer.typeorm.repository.ts` ordena
+ * `{ createdAt: 'DESC', id: 'DESC' }`, y este fake lo copia porque un fake que ordena distinto de
+ * la base deja verde un listado que en producción sale al revés. Cuando esto era una suposición se
+ * eligió por dos indicios: el único
  * precedente del repo ordena así (`order: { createdAt: 'DESC' }` en el `findAndCount` de
  * `users/infrastructure/persistence/user.typeorm.repository.ts`) y el índice que el contrato §8
  * fija para esta tabla es `idx_wallet_transfers_owner_id_created_at`. Si el adaptador acaba
@@ -77,7 +79,15 @@ export class InMemoryWalletTransferRepository implements WalletTransferRepositor
 
     const owned = [...this.store.values()]
       .filter((transfer) => transfer.ownerId === criteria.ownerId)
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+      // El desempate por `id` DESCENDENTE copia al adaptador real, que ordena
+      // `{ createdAt: 'DESC', id: 'DESC' }`. Sin él, dos filas del mismo instante quedarían en orden
+      // de inserción aquí y en orden de `id` en la base — y este archivo dice, en su propio JSDoc,
+      // que cuando el fake y el adaptador difieren **el equivocado es el fake**.
+      .sort(
+        (left, right) =>
+          right.createdAt.getTime() - left.createdAt.getTime() ||
+          (left.id.value < right.id.value ? 1 : -1),
+      );
     const skip = (criteria.page - 1) * criteria.limit;
 
     return Promise.resolve({

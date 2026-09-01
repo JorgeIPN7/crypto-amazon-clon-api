@@ -181,11 +181,22 @@ const TRANSFER_EXAMPLE = {
  * respuesta con cuerpo, claves de `ErrorPayload`, `error` derivado del status, y los ejemplos
  * contra su propio esquema con el mismo Ajv 2020-12): cero hallazgos salvo esos seis.
  *
- * ⚠️ **Lo que queda pendiente NO es el conjunto, es el cableado.** `wallets.module.ts` todavía no
- * existe y `AppModule` no importa ningún `WalletsModule`, así que estos cinco endpoints aún no
- * entran en el documento que recorre `openapi-contract.e2e-spec.ts`: ninguna de sus reglas los ha
- * visto todavía sobre el documento real, solo la sonda de arriba. Quien los cablee es quien las
- * estrena de verdad.
+ * **Desde el 2026-08-31 el cableado existe y el guardián de verdad ya los ha visto.**
+ * `wallets.module.ts` declara este controlador y `AppModule` importa `WalletsModule`, así que los
+ * cinco endpoints entran en el documento que recorre `openapi-contract.e2e-spec.ts`. Ese guardián
+ * recorre las operaciones DENTRO de cada caso, así que su cuenta de casos no se mueve al añadirlas
+ * —19 antes y 19 después, medido quitando `WalletsModule` de `app.module.ts` y volviendo a
+ * correrlo—: lo que cambia es lo que cada caso mira. Sale verde con `assignWallet`, `findMyWallet`,
+ * `activateMyWallet`, `transferFromMyWallet` y `listMyWalletTransfers` dentro, o sea que las reglas
+ * que la sonda anticipó las confirma ahora el documento real.
+ *
+ * ⚠️ Lo que ese guardián NO mira es la RESPUESTA: eso es
+ * `openapi-runtime-contract.e2e-spec.ts`, cuyo caso «debería ejercitar todas las operaciones que el
+ * documento publica» estuvo ROJO desde el cableado, con exactamente estas cinco rutas en el
+ * `Received` (`POST /wallets`, `GET /wallets/me`, `POST /wallets/me/activation`,
+ * `POST /wallets/me/transfers`, `GET /wallets/me/transfers`) y el resto de sus 16 casos en verde —
+ * medido—. Ese precio es deliberado y lo pagan los cinco escenarios que ese archivo ya tiene: uno
+ * por operación, cada uno con su montaje y con el proveedor doblado por el stub de loopback.
  *
  * Los ejemplos de las direcciones van en MINÚSCULAS a propósito. Una dirección con mayúsculas y
  * minúsculas mezcladas solo es válida si su checksum EIP-55 cuadra, y **aquí no se ha calculado
@@ -495,7 +506,8 @@ export class WalletsController {
       'Devuelve las transferencias del usuario del token, de la más reciente a la más antigua. ' +
       'No llama al proveedor: publica lo que el libro sabe. ⚠️ Una fila en `unknown` significa ' +
       'que el envío pudo minarse o no, y este ciclo no consulta la cadena para resolverlo. Al ' +
-      'rol admin le devuelve una página vacía, porque la master no envía por gas pump.',
+      'rol admin que nunca fue un usuario normal recibe una página vacía: la master no envía por ' +
+      'gas pump, y el filtro es por el `sub` del token, no por el rol.',
   })
   @ApiPaginatedEnvelope(WalletTransferResponseDto, {
     description: 'Página del libro de transferencias.',

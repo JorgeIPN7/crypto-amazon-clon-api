@@ -19,6 +19,7 @@ import { AuthModule } from '@modules/auth/auth.module';
 import { HealthModule } from '@modules/health/health.module';
 import { OrdersModule } from '@modules/orders/orders.module';
 import { UsersModule } from '@modules/users/users.module';
+import { WalletsModule } from '@modules/wallets/wallets.module';
 
 @Module({
   imports: [
@@ -55,6 +56,9 @@ import { UsersModule } from '@modules/users/users.module';
     // abierta. Va después de `UsersModule` porque lo importa (auth → users, una sola vía).
     AuthModule,
     OrdersModule,
+    // `wallets` va el último por la misma razón que `orders`: depende de `UsersModule`, que ya
+    // está arriba. La dirección es de una sola vía (wallets → users) y así se lee en la lista.
+    WalletsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

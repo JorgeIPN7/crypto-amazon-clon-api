@@ -15,9 +15,9 @@ import { WalletTransferOrmEntity } from './wallet-transfer.orm-entity';
 /**
  * Adaptador de salida del libro. `WalletTransferRepository` entra como VALOR —es su propio token
  * de inyección— y los dos `type` que lo acompañan, en línea; por eso sus nombres tienen que estar
- * en la lista cerrada del selector de `eslint.config.mjs`, que falla en cerrado a propósito. Esa
- * lista la escribe entera la tarea que cablea `src/modules/wallets/wallets.module.ts`: aquí no se
- * toca.
+ * en la lista cerrada del selector de `eslint.config.mjs`, que falla en cerrado a propósito.
+ * `FindTransfersCriteria` y `TransferPage` ya están en ella, junto a `SendCommand` y
+ * `WalletSaveOutcome`, desde que se cableó el módulo.
  *
  * **El criterio llega en UN objeto, con el dueño dentro.** No es cosmética: `findByOwner(ownerId,
  * criteria)` con dos parámetros del mismo grupo semántico es la firma que produce el bug de

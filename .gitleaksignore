@@ -1,37 +1,99 @@
 # Excepciones de gitleaks, una por LÍNEA y nunca por archivo ni por regla.
 #
 # Cada entrada silencia exactamente un hallazgo y ninguno más: si alguien añade un secreto de
-# verdad al mismo archivo, sigue saliendo rojo. Un `paths` o un `[[rules]] disabled` habrían
+# verdad a uno de estos archivos, sigue saliendo rojo. Un `paths` o un `[[rules]] disabled` habrían
 # apagado el gate para todo el archivo, que es justo lo que no se quiere.
 #
-# ⚠️ Nada de lo listado aquí es un secreto. Todos son literales de EJEMPLO en un documento de
-# planificación, y disparan la regla `generic-api-key`, que combina una palabra clave —`TOKEN`,
-# `KEY`— con la entropía de Shannon del valor que la sigue. La regla no puede distinguir una
-# dirección Ethereum pública de una credencial, y en este repo ya cobró esa factura una vez: en el
-# ciclo de `wallets` marcó dos direcciones públicas de un spec y se arregló renombrando la
-# constante de `TOKEN` a `CONTRACT` — quitar la palabra clave, no la comprobación.
+# ⚠️ Nada de lo listado aquí es un secreto:
 #
-# Aquí no se puede hacer lo mismo: el archivo es un plan ya escrito y sus fragmentos de código
-# reproducen el nombre que la constante tiene en el spec real.
+#   · Las direcciones `0x742d35cc…`, `0x782919af…` — direcciones de contrato ERC-20. Una dirección
+#     Ethereum es información PÚBLICA por construcción: se deriva de una clave pública y se publica
+#     en cada transacción.
 #
-# Qué hay exactamente, comprobado literal por literal:
-#
-#   · `0x742d35cc…f44e` y `0x782919af…42ba` — direcciones de contrato ERC-20. Una dirección
-#     Ethereum es información PÚBLICA por construcción: se deriva de una clave pública y se
-#     publica en cada transacción. No hay nada que filtrar.
-#
-#   · `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` — la clave privada de
-#     la **cuenta #0 de Hardhat y Anvil**, publicada en la documentación de ambos y presente en
+#   · `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` — la clave privada de la
+#     **cuenta #0 de Hardhat y Anvil**, publicada en la documentación de ambos y presente en
 #     millones de repositorios. Cualquier cadena local la financia con 10 000 ETH de juguete al
-#     arrancar; en una red real, cualquiera que quisiera vaciarla lo habría hecho hace años.
-#     Ponerla aquí es lo correcto precisamente porque NO es utilizable: usar una clave inventada
-#     de aspecto realista sería peor, porque podría colisionar con una cuenta de alguien.
+#     arrancar. Ponerla es lo correcto precisamente porque NO es utilizable: usar una clave
+#     inventada de aspecto realista sería peor, porque podría colisionar con una cuenta de alguien.
 #
-# ⚠️ Lo que esta lista NO cubre, y conviene saberlo: el job de CI escanea un rango de commits en
-# `push` y `pull_request`, y el historial completo solo en el cron semanal. Un secreto que entre
-# hoy no lo caza el PR siguiente — por eso el criterio del repo es correr gitleaks a mano ANTES
-# del primer commit que toque `.env.example` o un archivo de configuración, y no confiarlo al PR.
+# Todas disparan `generic-api-key`, que combina una palabra clave —`TOKEN`, `KEY`— con la entropía
+# de Shannon del valor que la sigue. La regla no puede distinguir una dirección pública de una
+# credencial.
+#
+# ── EL REMEDIO PREFERIDO NO ES ESTE ARCHIVO ────────────────────────────────────
+#
+# Es **quitar la palabra clave del nombre**, y en el ciclo de `wallets` se aplicó tres veces:
+# `TOKEN` → `CONTRACT`, `TRANSFER_TOKEN_ADDRESS` → `TRANSFER_CONTRACT`, `KEY` → `HARDHAT_SIGNER`.
+# Aquí solo entra lo que no se puede renombrar:
+#
+#   · Los `example` de OpenAPI del controlador: **`tokenAddress` es el nombre PUBLICADO del campo**,
+#     el mismo que manda el cliente y el mismo que espera el proveedor. Renombrarlo rompería el
+#     contrato para ahorrarle un falso positivo a un escáner.
+#   · Los fragmentos de código dentro del plan y el historial ya escrito: no se reescribe un
+#     documento de planificación ni un commit por esto.
+#
+# ── ⚠️ POR QUÉ ESTE ARCHIVO CADUCA SOLO, Y YA LO HA HECHO DOS VECES ───────────
+#
+# **Un fingerprint lleva el número de LÍNEA**, así que cualquier edición del archivo protegido lo
+# invalida en silencio: el hallazgo reaparece y la entrada vieja queda tapando una línea que ya no
+# es la suya. Medido dos veces en este mismo ciclo:
+#
+#   1. El controlador creció 11 líneas al añadirle documentación; sus dos `tokenAddress` pasaron de
+#      397/408 a 408/419. La entrada de `:408` siguió tapando por pura coincidencia y la otra dejó
+#      al aire un hallazgo NUEVO en `:419`.
+#   2. `wallet-transfer.factory.ts` se renombró en el árbol (`TOKEN` → `CONTRACT`) y el hallazgo
+#      desapareció del modo `--no-git`… pero **el commit sigue en el historial** y el cron semanal,
+#      que escanea en modo git, lo sigue viendo.
+#
+# **Y hay DOS conjuntos de números que no coinciden**, que es la trampa que costó descubrir:
+#
+#   · **Modo `--no-git`** —el gate manual que el repo exige antes de commitear— lee el ÁRBOL DE
+#     TRABAJO. Sus fingerprints no llevan sha.
+#   · **Modo git** —el que corre el cron semanal de `security.yml`— lee cada COMMIT. Sus
+#     fingerprints llevan el sha delante, y las líneas son las de aquella revisión.
+#
+# Las diez entradas del plan estuvieron nueve días tapando líneas 23 posiciones por debajo de las
+# reales, porque se escribieron mirando el árbol y el cron mira el commit. **Verificado que el
+# formato SIN sha también suprime en modo git**: añadiendo una sola entrada sin sha con la línea que
+# el modo git reporta, el conteo bajó de 11 a 10. O sea que el formato no era el problema; el número
+# de línea sí.
+#
+# Al tocar cualquiera de estos archivos, **vuelve a correr los dos modos** y regenera lo que cambie:
+#
+#     docker run --rm -w /repo -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 detect --source=. --no-git -v
+#     docker run --rm -w /repo -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 detect --source=. -v
 
+# ── Modo --no-git: el árbol de trabajo de HOY ─────────────────────────────────
+# Los dos `tokenAddress` de los `example` de OpenAPI.
+src/modules/wallets/infrastructure/http/wallets.controller.ts:generic-api-key:408
+src/modules/wallets/infrastructure/http/wallets.controller.ts:generic-api-key:419
+
+# ── Modo git: los commits del historial ───────────────────────────────────────
+# `wallet-transfer.factory.ts` en 7f12b1f, cuando la constante aún se llamaba TRANSFER_TOKEN_ADDRESS.
+# El renombrado arregló el árbol y NO el historial, que es lo que el cron mira.
+7f12b1f7b591741b0c7350591dee7418d001a4a4:src/modules/wallets/__tests__/helpers/wallet-transfer.factory.ts:generic-api-key:21
+
+# Los diez fragmentos de código del plan, en 8eb74f7. Ocho direcciones de contrato y dos claves de
+# Hardhat/Anvil, todas dentro de bloques de ejemplo.
+8eb74f7ab50cf2c38895f9e71d0dfa97433d5f47:docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:2775
+8eb74f7ab50cf2c38895f9e71d0dfa97433d5f47:docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:7669
+8eb74f7ab50cf2c38895f9e71d0dfa97433d5f47:docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:9748
+8eb74f7ab50cf2c38895f9e71d0dfa97433d5f47:docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:12648
+8eb74f7ab50cf2c38895f9e71d0dfa97433d5f47:docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:13949
+8eb74f7ab50cf2c38895f9e71d0dfa97433d5f47:docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:15027
+8eb74f7ab50cf2c38895f9e71d0dfa97433d5f47:docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:15157
+8eb74f7ab50cf2c38895f9e71d0dfa97433d5f47:docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:15372
+8eb74f7ab50cf2c38895f9e71d0dfa97433d5f47:docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:17238
+8eb74f7ab50cf2c38895f9e71d0dfa97433d5f47:docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:17249
+
+# El controlador en 8cb9975 (el commit del borde HTTP), cuando el segundo `tokenAddress` estaba en
+# la 397. Hoy en el árbol está en la 419; las dos entradas hacen falta porque cada modo lee una cosa.
+8cb99759df7a818fa4737ac72480ddbca7d6b26c:src/modules/wallets/infrastructure/http/wallets.controller.ts:generic-api-key:397
+
+# ── Modo --no-git: el plan, con las líneas del ÁRBOL ──────────────────────────
+# Las mismas diez de arriba, con los números que tienen HOY en el working tree. Que hagan falta
+# los dos juegos es exactamente lo que documenta la cabecera: el modo git lee el commit y el modo
+# --no-git lee el árbol, y entre uno y otro hay 23 líneas de diferencia.
 docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:2798
 docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:7692
 docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:9771
@@ -42,19 +104,3 @@ docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:15180
 docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:15395
 docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:17261
 docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:17272
-
-# ── Ejemplos de OpenAPI en `wallets.controller.ts` ─────────────────────────────
-#
-# Dos direcciones de contrato ERC-20 dentro de los `example` que el guardián del contrato EXIGE
-# publicar. Disparan `generic-api-key` por la misma razón de siempre: la clave `tokenAddress`
-# contiene la palabra `token` y el valor tiene entropía de dirección.
-#
-# ⚠️ **Aquí no se puede aplicar el remedio de arriba —renombrar para quitar la palabra clave—
-# porque `tokenAddress` es el nombre PUBLICADO del campo**, el mismo que el cliente manda y el
-# mismo que el proveedor espera. Renombrarlo rompería el contrato para ahorrarle un falso positivo
-# a un escáner. En los specs sí se renombra, y se ha hecho: ahí la constante se llama `CONTRACT`.
-#
-# El valor es una dirección Ethereum, o sea información pública por construcción: se deriva de una
-# clave pública y se publica en cada transacción.
-src/modules/wallets/infrastructure/http/wallets.controller.ts:generic-api-key:397
-src/modules/wallets/infrastructure/http/wallets.controller.ts:generic-api-key:408

@@ -9,6 +9,13 @@ El backlog del template, con las decisiones que ya vienen tomadas en esta base d
 archivado en [`docs/template-history/backlog.md`](./template-history/backlog.md). Su numeración
 está congelada y `stryker.config.mjs` la referencia, así que **este backlog empieza otra vez en 1**.
 
+⚠️ **Y eso hace que los dos ficheros COLISIONEN por número, que es la trampa a conocer.** Muchos
+comentarios del árbol dicen «backlog #N» refiriéndose al ARCHIVADO —#6 es el CVE de `js-yaml`, #12
+es el split de la migración de credenciales, #2 la exención de las migraciones—, y hoy esos mismos
+números resuelven a una entrada REAL y equivocada de este archivo. La convención para desambiguar,
+que ya usan un plan y un spec del repo, es escribir «#N **del template**»; una referencia sin ese
+sufijo apunta aquí.
+
 ---
 
 ## 1. La convención snake_case del esquema depende de que cada `@Column` no se olvide — CERRADA (2026-08-25)
@@ -394,10 +401,10 @@ la garantía no está en el dominio.
 
 ---
 
-## 17. Catorce mutantes del dominio de `wallets` salen como «error» y no como «muertos»
+## 17. Diecisiete mutantes del dominio de `wallets` salen como «error» y no como «muertos»
 
 **Qué pasa.** Desde que existe `wallet.entity.spec.ts`, `pnpm test:mutation --mutate
-"src/modules/wallets/domain/**/*.ts"` reporta **214 muertos y 14 con error**, cuando antes de esa
+"src/modules/wallets/domain/**/*.ts"` reporta **245 muertos y 17 con error**, cuando antes de esa
 suite daba **173 muertos y 0 errores**. Los mutantes son los mismos; lo que cambió es su
 clasificación. Reparto exacto: `ethereum-address.vo.ts` 5, `transaction-hash.vo.ts` 5,
 `address-index.vo.ts` 4.
@@ -528,9 +535,9 @@ nombre del test. Hoy ninguna de las dos cosas ocurre.
 
 ---
 
-## 19. Los cuatro campos anulables publican `type: "null"`, que no es válido en OpenAPI 3.0
+## 19. Los ocho campos anulables publican `type: "null"`, que no es válido en OpenAPI 3.0
 
-**Qué pasa.** El documento declara `openapi: 3.0.0` y cuatro campos de `wallets` publican
+**Qué pasa.** El documento declara `openapi: 3.0.0` y ocho campos de `wallets` publican
 `oneOf: [ {…}, { "type": "null" } ]`. `type: "null"` es vocabulario de JSON Schema 2020-12 y **no
 existe en OpenAPI 3.0**, que solo admite `nullable: true`. Ningún guardián lo caza: `null` sí es un
 tipo legal del meta-esquema 2020-12 contra el que Ajv compila, así que el contrato pasa en verde
@@ -555,7 +562,7 @@ implementa como extensión de OpenAPI en cualquier modo. El problema es el `enum
 **Qué NO es.** No es un fallo en ejecución: el servidor responde lo que el esquema describe y los
 dos guardianes pasan. Es una divergencia entre el dialecto declarado y el usado.
 
-**Qué SÍ es.** Un generador de SDK estricto con 3.0 puede atragantarse con esos cuatro campos.
+**Qué SÍ es.** Un generador de SDK estricto con 3.0 puede atragantarse con esos ocho campos.
 
 **Criterio, y es DECISIÓN DEL USUARIO porque cambia el contrato hacia fuera:**
 
@@ -570,19 +577,45 @@ no devuelva nada, o cuando el documento declare `openapi: 3.1.x`.
 
 ---
 
-## 20. La comprobación de arranque de la master existe pero todavía no está cableada
+## 20. La comprobación de arranque de la master existe pero todavía no está cableada — CERRADA (2026-08-31)
 
-**Qué pasa.** `MasterKeyStartupCheck` implementa `OnModuleInit` y su lógica está probada, pero
-**ningún módulo la declara**, así que a nivel de sistema la propiedad que existe para garantizar
-—que la app no arranca con una dirección que no corresponde a la clave— **hoy no se cumple**.
+**Qué pasaba.** `MasterKeyStartupCheck` implementaba `OnModuleInit` y su lógica estaba probada, pero
+**ningún módulo la declaraba**, así que a nivel de sistema la propiedad que existe para garantizar
+—que la app no arranca con una dirección que no corresponde a la clave— **no se cumplía**.
 
-Medido arrancando el binario real con una dirección incoherente: arranca igual.
+Medido arrancando el binario real con una dirección incoherente: arrancaba igual.
 
-**Criterio ya decidido.** Lo cierra la tarea que cablea `wallets.module.ts`: tiene que declararla
-en `providers` y `AppModule` importar el módulo. Y hace falta un E2E que arranque con configuración
-incoherente y afirme que el arranque muere — es lo único que distingue «la clase existe» de «la
-garantía está activa».
+**Criterio que estaba decidido.** Lo cierra la tarea que cablea `wallets.module.ts`: tiene que
+declararla en `providers` y `AppModule` importar el módulo. Y hace falta un E2E que arranque con
+configuración incoherente y afirme que el arranque muere — es lo único que distingue «la clase
+existe» de «la garantía está activa».
 
-**Cómo se sabrá que está hecho.** Cuando exista ese E2E y se ponga rojo al quitar el proveedor.
+**Cerrada haciendo LAS DOS cosas.** `src/modules/wallets/wallets.module.ts` la declara en
+`providers` y `src/app.module.ts` importa `WalletsModule`; el caso «debería abortar el arranque
+cuando la dirección de la master no corresponde a su clave privada» de
+`src/modules/wallets/__tests__/wallets.module.e2e-spec.ts` compila el `AppModule` real con
+`WALLETS_MASTER_ADDRESS` y `WALLETS_MASTER_PRIVATE_KEY` de EOAs distintas y afirma que **`init()`**
+rechaza con el mensaje exacto. `init()` y no `compile()`: `TestingModuleBuilder.compile()` no
+dispara hooks de ciclo de vida, así que un E2E que solo compilara quedaría verde sin el proveedor.
+
+**Las tres mediciones, sobre el binario compilado (`pnpm build` → `node dist/src/main.js`) con
+`WALLETS_MASTER_ADDRESS=0xabab…ab` y `WALLETS_MASTER_PRIVATE_KEY=0x1111…11`, que son de EOAs
+distintas:**
+
+| Estado del árbol                           | Resultado del arranque                                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Sin el proveedor (import y línea borrados) | **Arranca**: `Nest application successfully started` + `Application ready at …`, cero errores                |
+| Solo la línea de `providers` borrada       | **No compila**: `TS6133: 'MasterKeyStartupCheck' is declared but its value is never read` (`noUnusedLocals`) |
+| Con el proveedor                           | **Muere**: `EXIT=1`, `Fatal bootstrap error Error: WALLETS_MASTER_ADDRESS (0xabab…) no corresponde a …`      |
+
+La fila del medio es una protección real pero **parcial**, y por eso no sustituye al E2E: solo caza
+el descuido de borrar la línea dejando el import; borrando las dos, `tsc` da `Found 0 issues`.
+
+**Cómo se supo que está hecho.** Quitando el proveedor, de los ocho casos de
+`wallets.module.e2e-spec.ts` caen DOS: el de arriba, con `Expected constructor: Error / Received
+value: undefined` —el `init()` ya no rechaza, así que no hay error que capturar—, y «debería
+resolver la comprobación de arranque de la clave de la master», con
+`Nest could not find MasterKeyStartupCheck element`. El primero es el que afirma la garantía; el
+segundo solo el registro, y se queda porque falla antes y nombra la línea que falta.
 
 ---

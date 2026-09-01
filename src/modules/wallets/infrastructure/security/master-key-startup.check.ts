@@ -13,10 +13,20 @@ import { assertMasterKeyMatchesAddress } from './master-address.derivation';
  * configuración, no contra la clave, así que una configuración con la dirección de una cuenta y la
  * clave de otra pasa todo lo demás y solo falla al enviar, con el gas ya gastado.
  *
- * ⚠️ **Solo sirve si `wallets.module.ts` lo declara en `providers`.** Nest no instancia lo que no
- * está registrado, así que sin esa línea esta clase existe y no comprueba nada: el gate de
- * fronteras no lo ve y ningún test unitario lo notaría. Quien sí lo notaría es un E2E que arranque
- * el módulo con una configuración incoherente, y por eso ese caso vale más que este archivo.
+ * ⚠️ **Solo sirve si `wallets.module.ts` lo declara en `providers`, y desde el 2026-08-31 lo
+ * declara.** Nest no instancia lo que no está registrado, así que sin esa línea esta clase existe y
+ * no comprueba nada: el gate de fronteras no lo ve y ningún test unitario lo notaría. Quien sí lo
+ * nota —y es lo que cerró el backlog #20— es el caso «debería abortar el arranque cuando la
+ * dirección de la master no corresponde a su clave privada» de
+ * `../../__tests__/wallets.module.e2e-spec.ts`: compila el `AppModule` real con
+ * `WALLETS_MASTER_ADDRESS` y `WALLETS_MASTER_PRIVATE_KEY` de EOAs distintas y afirma que `init()`
+ * rechaza. Ese caso vale más que este archivo, y se comprobó que mide: borrando la línea de
+ * `providers` se pone rojo (junto con el que solo afirma el registro).
+ *
+ * ⚠️ **`init()`, no `compile()`.** `TestingModuleBuilder.compile()` construye las instancias y no
+ * dispara ningún hook de ciclo de vida —leído en `@nestjs/testing/testing-module.builder.js`—, así
+ * que un E2E que solo compile dejaría este `onModuleInit` sin ejecutar y quedaría verde con el
+ * provider quitado.
  *
  * `ConfigService` se importa como VALOR (nunca `import type`): con `emitDecoratorMetadata`, un
  * `import type` se elide, la metadata no se emite y Nest falla en RUNTIME con

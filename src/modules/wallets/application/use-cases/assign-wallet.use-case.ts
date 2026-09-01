@@ -34,7 +34,10 @@ export type AssignWalletInput = {
  * dos, rompiendo la invariante «una sola EOA en el sistema». Escrita en el borde HTTP, la regla se
  * saltaba con solo llamar al caso de uso desde otro sitio; escrita aquí, el único camino pasa por
  * ella y el filtro del contexto la publicará como 409 igual que cualquier otro error de dominio.
- * ⚠️ Ese filtro todavía NO existe , así que hoy este error es un 409 previsto, no publicado.
+ * ⚠️ Y ese 409 está PUBLICADO, no previsto: `infrastructure/http/wallets-domain-exception.filter.ts`
+ * mapea `AdminUsesMasterAddressError` a `ConflictException`, `wallets.controller.ts` lo declara
+ * con `@UseFilters` en `POST /wallets`, y el caso «debería responder 409 al rol admin, que ya
+ * tiene la master» de `wallets.e2e-spec.ts` lo comprueba contra la app real.
  *
  * **Si la pasarela falla, lo que queda huérfano es un NÚMERO, no una fila** — por eso no hay
  * compensación y escribirla sería ceremonia. La compensación existe para desbloquear un reintento,

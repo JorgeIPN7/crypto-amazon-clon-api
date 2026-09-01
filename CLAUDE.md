@@ -170,7 +170,7 @@ Every bounded context lives under `src/modules/<context>/` with layers **inside*
 mandatory** — it has a two-token segregated facade, pagination and driver-error translation
 because it needs them. `docs/module-blueprint.md` is the list of what is required and what is
 optional, plus the order to build it in; `pnpm module:new <context> [entity]` generates every
-required piece already passing typecheck, lint (boundaries included), format and its own tests. There are three: `users` (profiles), `auth` (credentials and tokens) and `orders`, plus the flat `health`.
+required piece already passing typecheck, lint (boundaries included), format and its own tests. There are four: `users` (profiles), `auth` (credentials and tokens), `orders` and `wallets` (custodial Ethereum addresses), plus the flat `health`.
 
 ```
 src/modules/<context>/
@@ -202,7 +202,7 @@ src/modules/<context>/
   - **A port declares only public `abstract` members** — no fields, no `protected`/`private`, no constructor. Two bans, two different causes, both measured with `tsc 6.0.3 --noEmit --strict`. A **field** (public, `protected` or `private`) or a **parameter property** makes the object-literal fakes stop compiling (`TS2741`; there is a real fake in `orders/__tests__/infrastructure/users-customer.directory.spec.ts`). An **empty `protected constructor()` compiles fine** — it is banned for another reason: adapters `implements` and never `extends`, so the port never enters their prototype chain and that constructor never runs. It is dead code promising an initialisation nobody executes, and the doorway parameter properties come in through.
   - **Adapters `implements`, never `extends`.** `extends` would burn the single inheritance slot and demand an empty `super()` for nothing, and `useClass` works identically either way. `implements` is also the _only_ thing that checks conformity: `ClassProvider.provide` is typed `any`, so the module file verifies nothing.
   - **Never `import type` a port in a file that has decorators** (use cases, adapters, modules). The reference is elided, the metadata is never emitted, and it fails **at runtime** — `Nest can't resolve dependencies of the CreateUserUseCase (?, PasswordHasher)` — with `lint:check` **and** `typecheck` green. That's why `eslint.config.mjs` bans it under `src/modules/*/{application,infrastructure}/**` in **both** shapes the erasure takes — the `import type { … }` declaration _and_ the mixed `import { VALUE, type Port }` specifier, whose declaration `importKind` is `"value"` and so needs its own selector — from any `ports/` file **or** a foreign `*.module` (which is where `UsersLookup` and `UsersProvisioning`, the only cross-module ports, live). In the test fakes it is the reverse: no decorators means `consistent-type-imports` _demands_ `import type`. The asymmetry is real; the discriminator is "does this file contain a decorator" — with `emitDecoratorMetadata` on, `consistent-type-imports` skips such files entirely.
-- **Inline `type` stays legal for the data that travels with a port** — `UserPage`, `FindUsersCriteria`, `SignedToken`, `TokenClaims`, `DirectoryUser`, `CreateProfileResult`, `UserSummary` are not injectable, so `import { UserRepository, type UserPage } from '…'` is the correct shape. Those seven names are a **closed list inside the lint rule**, because nothing in the import site distinguishes a port from its data: the specifier selector fails closed, so a port marked `type` by accident goes red on its own and a genuinely new data type costs one reviewed line in `eslint.config.mjs`. Three files import _only_ such data from a `ports/` file and can't use the inline form (`no-import-type-side-effects` rejects it): `jwt-auth.guard.ts`, `authenticated-user.dto.ts` and `registered-account-response.dto.ts`. All three carry a justified `eslint-disable-next-line` saying so. The discriminator is real, not a loophole: none of them injects a port.
+- **Inline `type` stays legal for the data that travels with a port** — `UserPage`, `FindUsersCriteria`, `SignedToken`, `TokenClaims`, `DirectoryUser`, `CreateProfileResult`, `UserSummary`, `WalletSaveOutcome`, `FindTransfersCriteria`, `TransferPage`, `SendCommand` are not injectable, so `import { UserRepository, type UserPage } from '…'` is the correct shape. Those eleven names are a **closed list inside the lint rule**, because nothing in the import site distinguishes a port from its data: the specifier selector fails closed, so a port marked `type` by accident goes red on its own and a genuinely new data type costs one reviewed line in `eslint.config.mjs`. Three files import _only_ such data from a `ports/` file and can't use the inline form (`no-import-type-side-effects` rejects it): `jwt-auth.guard.ts`, `authenticated-user.dto.ts` and `registered-account-response.dto.ts`. All three carry a justified `eslint-disable-next-line` saying so. The discriminator is real, not a loophole: none of them injects a port.
 - **One use case per file, input included.** `application/use-cases/create-user.use-case.ts` holds `CreateUserUseCase` **and** its `export type CreateUserInput`. There is no `commands/`, no `queries/`, no `handlers/`: a command class whose only job was to carry three positionals into `execute()` bought a file, an import and a `new` per call site, and no invariant — the input is the use case's signature, not a reusable piece. Inputs are plain `type`s, **never** classes with `class-validator`: boundaries rule 2 bans that library from `application/`, and transport validation is the HTTP DTO's job. The controller calls `execute({ email: dto.email, … })`, which also kills the positional-argument bug class.
   - **The method stays `execute()`** — one public operation, same name in every use case.
   - **`users.facade.ts` stays loose in `application/`**, outside `use-cases/`: it is the context's public gate for other modules, not an intention of a user of the system. Its surface grows by method, not by file.
@@ -282,6 +282,79 @@ cannot:
   (`pnpm outbox:relay`, `src/database/outbox/` — a module cannot import `database`, same
   reason the seed lives there): publishes pending rows (today: a structured log) and marks
   them, at-least-once. When BullMQ lands (Tier 2), only the publisher changes.
+
+## Wallets
+
+Cuarto bounded context (`src/modules/wallets/`): una **dirección Ethereum custodiada** por usuario,
+sobre **Tatum Gas Pump**. Cinco endpoints, todos `@Auth()`: asignar la dirección, leerla, activarla,
+transferir y listar el historial.
+
+⚠️ **Es CUSTODIAL, y no por preferencia de diseño.** Una gas pump address **es un contrato
+inteligente**: no tiene clave privada, así que no existe la clave que entregar al usuario. Quien
+firma es siempre la master —`POST /v3/blockchain/sc/custodial/transfer` exige `fromPrivateKey`, «la
+clave privada de la dirección que posee la gas pump address»— y quien paga el gas, también. De las
+tres propiedades que se pidieron —Gas Pump, el admin paga los fees, wallets no custodiadas— solo
+caben dos.
+
+- **Una sola EOA en el sistema, y es la del admin.** Toda dirección que se entrega a un usuario es
+  **derivada**. `POST /wallets` responde **409** al rol admin: la master no tiene índice, así que la
+  operación no existe para ella. La invariante tiene **cinco** controles y ninguno sustituye a otro:
+  `Wallet.assign()`, el adaptador al derivar, el `CHECK` del esquema, la comprobación de arranque y
+  el E2E. ⚠️ **La EOA del admin NO está en la tabla `wallets`**: responder «qué direcciones
+  controlamos» exige mirar la tabla **y** la configuración.
+- **`mainnet` está vetada en el arranque** por un `refine()` de `env.schema.ts`. Toda transferencia
+  firma con una clave privada cruda en el cuerpo, que el proveedor documenta como testnet-only.
+  ⚠️ **Este código no puede ir a producción sin otro ciclo**: la salida es el KMS del proveedor, y
+  eso cambia la firma del puerto (`signatureId` en vez de `txId`).
+- **El índice lo da una `SEQUENCE`, no `max(index)+1`.** Dos razones y la segunda es la decisiva:
+  `max()` **recicla el índice de una fila borrada** —dos usuarios sobre la misma dirección— y obliga
+  al orden `leer max → precalcular en Tatum → INSERT`, así que **cada colisión tira 2 créditos**. Con
+  `nextval` el índice es nuestro antes de gastar nada, y sus huecos son gratis: precalcular no toca
+  la cadena. ⚠️ `nextval` devuelve `bigint` y node-postgres lo entrega como **string**.
+- **El alta es idempotente y responde 200, no 201.** La segunda llamada no crea nada, y publicar 201
+  en un endpoint que la mitad de las veces no crea es la ficción que el guardián del contrato existe
+  para impedir. La carrera se resuelve con **una** relectura, nunca un bucle: reintentarla gastaría
+  otro crédito para volver a arriesgar la misma carrera. Por eso `WalletRepository.save()` devuelve
+  un **desenlace** (`owner-conflict`) en vez de lanzar, y por eso `WalletAlreadyAssignedError` **no
+  existe**.
+- **Fallo parcial sin compensación, y es correcto.** Si se reserva el índice y el proveedor falla, lo
+  huérfano es un **número**, no una fila: no bloquea ningún reintento y `nextval` es irreversible por
+  diseño. Compensar sería ceremonia. Es la asimetría con `RegisterAccountUseCase`, donde el perfil
+  huérfano SÍ retiene su email y bloquea al dueño para siempre.
+- **El libro de transferencias escribe POR DELANTE.** La fila existe **antes** de llamar al
+  proveedor, y después de toda la validación local: antes se llenaría de rechazos que nunca salieron
+  del proceso, después un timeout no dejaría rastro. Tres desenlaces y son tres a propósito —
+  `submitted` con hash, `rejected` solo para el 400 de validación (**no pasó nada en la cadena**) y
+  **`unknown`** para timeout, red caída o 5xx. ⚠️ `unknown` es el estado honesto: **pudo minarse o**
+  **no**. No se inventa un `rejected`, que afirmaría algo falso, ni un `submitted` sin hash.
+- **El motivo del fallo es un CÓDIGO de lista cerrada, jamás el `message` del proveedor.** El del 401
+  de Tatum interpola la clave de API y esa columna se publica por `GET /wallets/me/transfers`.
+  Quien lo impide es el TIPO, no la disciplina: medido, pasar `error.message` no compila, y la misma
+  clase con `reason: string` sí. ⚠️ Lo que el tipo NO cubre es `rehydrate`: ahí el valor viene de la
+  fila, así que el cierre es un `CHECK` en la migración.
+- **La reconciliación es perezosa y no hay planificador.** Vive dentro de activar y de transferir,
+  con `GET …/activated/…` — que es una llamada que hay que hacer igualmente: la precondición y la
+  reconciliación son el mismo dato. El estado es **monótono**, así que una vez cacheado `active` el
+  coste tiende a cero. ⚠️ `GET /wallets/me` **puede ir por detrás de la cadena**, y su `description`
+  lo publica.
+- **El checksum EIP-55 vive en el DTO, no en el dominio.** `domain/` no importa librerías externas y
+  **keccak256 no está en `node:crypto`** —su `sha3-256` es otro algoritmo, medido: sobre la cadena
+  vacía dan hashes distintos—. Se acepta una dirección mono-caja (no lleva checksum que comprobar) y
+  se **verifica** la de caja mezclada. La garantía cubre solo lo que entra por HTTP; el otro origen
+  es el proveedor, que las devuelve en minúsculas.
+- **El E2E corre contra un stub HTTP real** (`test/helpers/tatum-stub-server.ts`), no contra un doble
+  por configuración. El motivo es que el guardián de contrato en ejecución existe porque _un ejemplo
+  puede cumplir el esquema y el servidor devolver otra cosa_: un adaptador falso lo pondría en verde
+  mientras el real nunca corre. Cuatro capas impiden confundir un fallo del stub con uno real, y una
+  de ellas afirma que la config apunta a **loopback** — sin eso, el E2E de transferencias movería
+  dinero real.
+
+⚠️ **Lo que este ciclo NO cierra**, con entrada propia en `docs/backlog.md`: no hay clave de
+idempotencia en el envío (un reintento del cliente tras un timeout puede transferir dos veces), las
+filas en `unknown` no se resuelven, no hay gestión de `nonce`, no se lee el `invalid[]` de una
+activación fallida, no hay bloqueo optimista —dos activaciones concurrentes queman el gas dos
+veces— y nadie vigila el saldo de la master, que es punto único de fallo: si se queda sin ETH,
+**todas** las activaciones y transferencias fallan a la vez.
 
 ## Endpoint documentation — mandatory and verified
 

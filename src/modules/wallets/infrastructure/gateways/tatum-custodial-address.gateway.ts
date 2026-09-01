@@ -11,9 +11,11 @@ import {
 } from '../../domain/errors/wallet.errors';
 // ⚠️ `SendCommand` es un DATO que acompaña al puerto, así que su forma natural sería el `type`
 // inline —`import { CustodialAddressGateway, type SendCommand }`—, y aquí no lo lleva porque su
-// nombre todavía NO está en la lista cerrada del segundo selector de `no-restricted-syntax`
-// (`eslint.config.mjs`, hoy: CreateProfileResult, DirectoryUser, FindUsersCriteria, SignedToken,
-// TokenClaims, UserPage, UserSummary). Medido escribiéndolo con `type` y corriendo
+// nombre YA está en la lista cerrada del segundo selector de `no-restricted-syntax`
+// (`eslint.config.mjs`), que pasó de siete a once nombres al cerrarse el ciclo. Se deja como VALOR
+// porque cambiarlo ahora no aporta nada. La enumeración de nombres que había aquí se ha quitado a
+// propósito: duplicaba una lista que vive en el lint y caducaba con ella. Cuando el nombre no
+// estaba, la medición era: escribirlo con `type` y correr
 // `npx eslint` sobre este archivo: `error … no-restricted-syntax` en la columna del specifier.
 // La salida mientras tanto es importarlo como VALOR, que es la que prescribe el JSDoc del puerto
 // y la que `list-wallet-transfers.use-case.ts` ya escribe para `TransferPage`. Quien añada los

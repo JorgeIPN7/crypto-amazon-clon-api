@@ -99,9 +99,11 @@ const globalFetch: FetchLike = (input, init) => fetch(input, init);
  *     Nest can't resolve dependencies of the TatumHttpClient (ConfigService, ?). Please make
  *     sure that the argument at index [1] is available in the current module.
  *
- * La sonda no está en el árbol: es una comprobación de cableado, no un caso de la Tabla T23. El
- * arranque real llegará con `src/modules/wallets/wallets.module.ts`, que todavía no existe
- * (medido: `ls src/modules/wallets/*.module.ts` no devuelve nada).
+ * La sonda no está en el árbol: es una comprobación de cableado, no un caso de la Tabla T23. Quien
+ * la ejerce de verdad desde el 2026-08-31 es `src/modules/wallets/wallets.module.ts`, que declara
+ * esta clase en `providers`, y el bloque «grafo de inyección» de
+ * `src/modules/wallets/__tests__/wallets.module.e2e-spec.ts`, que compila el `AppModule` real y
+ * resuelve cada token del contexto.
  */
 @Injectable()
 export class TatumHttpClient {
