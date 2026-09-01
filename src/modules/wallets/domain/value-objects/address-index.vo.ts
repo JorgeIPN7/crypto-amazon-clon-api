@@ -32,13 +32,14 @@ const MAX_ADDRESS_INDEX = 2_147_483_647;
  * Índice de derivación de una gas pump address bajo la master. Entero no negativo: el primero que
  * entrega la secuencia de PostgreSQL es el 0, y el admin no consume ninguno (opera la master).
  *
- * ⚠️ Su error DEBE salir como **500**, no como 400 (spec §3.5), y hoy eso es una decisión
- * pendiente, no un hecho: quien la hará cierta es el mapa de
- * `infrastructure/http/wallets-domain-exception.filter.ts`. Sin su fila
- * explícita, el fallback del filtro lo publicaría como 400. El motivo: ningún cliente pasa un
- * índice por la API, así que si esto se dispara es la secuencia agotada o una fila corrupta, y
- * publicarlo como «entrada inválida» lo escondería del `ErrorReporter`, que solo ve 5xx.
- * Mismo contrato, y misma deuda, que `WalletId` y `TransferId`.
+ * ⚠️ Su error sale como **500**, no como 400 (spec §3.5), y ya es un hecho: lo hace cierto la fila
+ * `[InvalidAddressIndexError, internalServerError]` de
+ * `infrastructure/http/wallets-domain-exception.filter.ts`, con su caso «debería traducir
+ * InvalidAddressIndexError a 500». (Antes esto decía «decisión pendiente, no un hecho»; se
+ * corrige al aterrizar el mapa.) Sin esa fila explícita, el fallback del filtro lo publicaría
+ * como 400. El motivo: ningún cliente pasa un índice por la API, así que si esto se dispara es la
+ * secuencia agotada o una fila corrupta, y publicarlo como «entrada inválida» lo escondería del
+ * `ErrorReporter`, que solo ve 5xx. Mismo contrato, y ya sin deuda, que `WalletId` y `TransferId`.
  */
 export class AddressIndex extends ValueObject<number> {
   /**

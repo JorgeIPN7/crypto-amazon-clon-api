@@ -101,10 +101,14 @@ export class TatumCustodialAddressGateway implements CustodialAddressGateway {
   /**
    * `from == to`: se pide UN índice, así que la respuesta tiene que traer UNA dirección. Y la
    * dirección derivada no puede ser la master: sería entregarle a un usuario el fondo de gas de
-   * la plataforma, y al siguiente el mismo. El error lleva la dirección devuelta y **debe** salir
-   * 500 al `ErrorReporter`, no 400 — así lo escribe la tabla §3.5 del spec; quien lo hará cierto es
-   * `wallets-domain-exception.filter.ts`, que todavía no existe (medido:
-   * `ls src/modules/wallets/infrastructure` devuelve solo `gateways`).
+   * la plataforma, y al siguiente el mismo. El error lleva la dirección devuelta y sale **500** al
+   * `ErrorReporter`, no 400 — así lo escribe la tabla §3.5 del spec, y lo hace cierto la fila
+   * `[WalletAddressIsMasterError, internalServerError]` de `wallets-domain-exception.filter.ts`,
+   * con su caso «debería traducir WalletAddressIsMasterError a 500». (Este paréntesis decía que
+   * ese filtro «todavía no existe», con un `ls` como medición; el archivo aterrizó y la frase
+   * habría quedado INVERTIDA —negando una protección que sí existe—, así que se corrige en vez de
+   * borrarse.) Su cuerpo además sale saneado: el 500 publica `Internal server error` y la
+   * dirección viaja solo en el `cause`.
    *
    * Los dos controles de este método están medidos por separado:
    *  · Borrando el `if` de la master: cae **un** caso, «debería rechazar con nombre una

@@ -43,9 +43,12 @@ export type FindWalletByOwnerInput = {
  * cualquier intento de usarla da 500 con nombre — que es el orden de descubrimiento que se quiere.
  *
  * ⚠️ **El estado que publica puede ir POR DETRÁS de la cadena**: la reconciliación es perezosa y
- * vive en activar y en transferir, no aquí (spec §5.4). Es deuda escrita, y la `description` de
- * `GET /wallets/me` tendrá que decirla en `infrastructure/http/wallets.controller.ts` — que hoy no
- * existe:
+ * vive en activar y en transferir, no aquí (spec §5.4).
+ *
+ * Y el cliente ya está avisado: la `description` de `GET /wallets/me` en
+ * `infrastructure/http/wallets.controller.ts` lo publica —una activación confirmada hace minutos
+ * puede seguir apareciendo como `activating`, y para saberlo con certeza hay que llamar al
+ * endpoint de activación, que sí reconcilia—. La deuda está saldada donde se lee, no aquí.
  */
 @Injectable()
 export class FindWalletByOwnerUseCase {

@@ -27,14 +27,18 @@ export type ListWalletTransfersInput = {
  * y dos veces en `transfer-asset.use-case.ts`— que la delegan todos en «el consumidor». Este
  * archivo es hoy el único lector del libro en el árbol, y también la delega.
  *
- * Quien tendrá que aplicarla es el **DTO de respuesta del libro**,
- * `infrastructure/http/dto/wallet-transfer-response.dto.ts`. ⚠️ Aquí había una medición de su
- * ausencia —`find src/modules/wallets/infrastructure -name '*transfer*'`, «no devuelve nada»— y se
- * ha quitado porque se pudrió: ese `find` devuelve hoy los dos archivos de persistencia del libro,
- * que no son el DTO. Lo que importa es el archivo, no el hueco.
- * Hasta que ese DTO aplique la regla, `GET /wallets/me/transfers` publicaría `submitting` tal cual —
- * no es incorrecto (el vocabulario lo incluye), pero es MENOS honesto que `unknown`: dice «aún no
- * se sabe» de una petición que ya terminó.
+ * Este párrafo señalaba al **DTO de respuesta del libro**,
+ * `infrastructure/http/dto/wallet-transfer-response.dto.ts`, como quien tendría que aplicarla.
+ * ⚠️ **Ese DTO ya aterrizó y NO la aplica**, y conviene decirlo aquí para que nadie siga esperando
+ * que llegue: publica `status` tal cual. El motivo es que el DTO no puede distinguir los dos
+ * casos —la fila que se acaba de escribir en la petición que está respondiendo, donde
+ * `submitting` es exacto, y la que quedó colgada de una petición anterior, donde miente— porque
+ * no tiene noción de «después de responder»; separarlos exige comparar `createdAt` contra un
+ * umbral de antigüedad, y ese umbral es una decisión de negocio que nadie ha tomado. Mientras no
+ * se tome, `GET /wallets/me/transfers` publica `submitting` tal cual: no es incorrecto —el
+ * vocabulario lo incluye— pero es MENOS honesto que `unknown`, porque dice «aún no se sabe» de
+ * una petición que ya terminó. El JSDoc de `status` en ese DTO lo publica como convención de
+ * LECTURA para el cliente, que es lo único que hoy se sostiene.
  *
  * **Recibe `page`/`limit` y los entrega TAL CUAL en el criterio.** Es el vocabulario del cliente
  * —el mismo que publica `src/common/dto/pagination.dto.ts`— y quien lo traduce a desplazamiento es

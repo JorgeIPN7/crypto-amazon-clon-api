@@ -527,3 +527,62 @@ con `killed` distinto de cero, o cuando `@fast-check/jest` deje de interpolar la
 nombre del test. Hoy ninguna de las dos cosas ocurre.
 
 ---
+
+## 19. Los cuatro campos anulables publican `type: "null"`, que no es válido en OpenAPI 3.0
+
+**Qué pasa.** El documento declara `openapi: 3.0.0` y cuatro campos de `wallets` publican
+`oneOf: [ {…}, { "type": "null" } ]`. `type: "null"` es vocabulario de JSON Schema 2020-12 y **no
+existe en OpenAPI 3.0**, que solo admite `nullable: true`. Ningún guardián lo caza: `null` sí es un
+tipo legal del meta-esquema 2020-12 contra el que Ajv compila, así que el contrato pasa en verde
+publicando un dialecto que no es el que declara.
+
+**Por qué no se usó `nullable`, medido y no supuesto.** Las dos razones se comprobaron con el mismo
+Ajv que usan los dos guardianes y con el `SchemaObjectFactory` de `@nestjs/swagger@11.4.7`:
+
+1. **`nullable` NO sobrevive junto a `enum`, y este módulo tiene justo ese campo.**
+   `{ type: "string", enum: ["a","b"], nullable: true }` valida `null` como **false** — el `enum`
+   sigue constriñendo y `null` no está en la lista. El `reason` del libro de transferencias es
+   exactamente esa forma, así que con `nullable` la respuesta real fallaría el guardián de runtime
+   con `must be equal to one of the allowed values`.
+2. **`nullable` sin un `type:` explícito publica `type: "object"` en silencio.** El `design:type` de
+   un campo `string | null` es `Object`. Con `oneOf` el `type` reflejado se borra; con `nullable'
+hay que acertar un `type:` a mano en cada campo.
+
+⚠️ **Una creencia extendida que resultó FALSA y conviene no repetir**: que «Ajv ignora `nullable`».
+Medido: `{ type: "integer", nullable: true }` acepta `null` y sigue rechazando `"x"`. Ajv lo
+implementa como extensión de OpenAPI en cualquier modo. El problema es el `enum`, no Ajv.
+
+**Qué NO es.** No es un fallo en ejecución: el servidor responde lo que el esquema describe y los
+dos guardianes pasan. Es una divergencia entre el dialecto declarado y el usado.
+
+**Qué SÍ es.** Un generador de SDK estricto con 3.0 puede atragantarse con esos cuatro campos.
+
+**Criterio, y es DECISIÓN DEL USUARIO porque cambia el contrato hacia fuera:**
+
+| Salida                               | Coste                                                                                                                                           |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dejarlo y aceptar el riesgo          | Cero hoy; la deuda queda escrita aquí                                                                                                           |
+| **Subir el documento a OpenAPI 3.1** | `type: "null"` pasa a ser legal. Afecta a TODO el documento, no solo a `wallets`, y hay que comprobar que Scalar y los consumidores lo digieren |
+| Volver a `nullable`                  | Rompe el campo `reason` hoy, en un gate que sí corre. **No es viable sin más**                                                                  |
+
+**Cómo se sabrá que está hecho.** Cuando `grep -rn "type: .null." src/modules/wallets/infrastructure/http/`
+no devuelva nada, o cuando el documento declare `openapi: 3.1.x`.
+
+---
+
+## 20. La comprobación de arranque de la master existe pero todavía no está cableada
+
+**Qué pasa.** `MasterKeyStartupCheck` implementa `OnModuleInit` y su lógica está probada, pero
+**ningún módulo la declara**, así que a nivel de sistema la propiedad que existe para garantizar
+—que la app no arranca con una dirección que no corresponde a la clave— **hoy no se cumple**.
+
+Medido arrancando el binario real con una dirección incoherente: arranca igual.
+
+**Criterio ya decidido.** Lo cierra la tarea que cablea `wallets.module.ts`: tiene que declararla
+en `providers` y `AppModule` importar el módulo. Y hace falta un E2E que arranque con configuración
+incoherente y afirme que el arranque muere — es lo único que distingue «la clase existe» de «la
+garantía está activa».
+
+**Cómo se sabrá que está hecho.** Cuando exista ese E2E y se ponga rojo al quitar el proveedor.
+
+---

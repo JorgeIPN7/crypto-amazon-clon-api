@@ -70,23 +70,31 @@ export type TatumCredentials = {
    * matriz de fronteras, no una preferencia.
    *
    * Este archivo es el único sitio donde el valor pasa del entorno a un objeto de la aplicación.
-   * Medido con `grep -rn WALLETS_MASTER_PRIVATE_KEY src/ --include='*.ts' | grep -v __tests__`:
-   * dos archivos, este y `env.schema.ts`, que valida su formato y nunca lo transporta. Sin
-   * excluir los tests salen dos más, y los dos solo lo nombran para CONSTRUIR entornos de prueba
-   * —no para transportarlo—; se acotan a propósito para que el grep mida lo que la frase afirma.
-   * Por eso no se loguea, no se interpola en ningún mensaje de error y no viaja en ningún
+   * Medido con `grep -rln WALLETS_MASTER_PRIVATE_KEY src/ --include='*.ts' | grep -v __tests__`:
+   * **cuatro** archivos, y solo este TRANSPORTA el valor. Los otros tres nombran la VARIABLE, no
+   * la leen: `env.schema.ts` valida su formato, y `master-address.derivation.ts` y
+   * `master-key-startup.check.ts` la citan dentro de mensajes de error fijos para decirle al
+   * operador cuál corregir. (Eran dos hasta el 2026-08-31, cuando aterrizó la comprobación de
+   * arranque; el número anterior está aquí porque el grep es la medida y cambió.) Sin excluir los
+   * tests salen más, y solo nombran la variable para CONSTRUIR entornos de prueba.
+   *
+   * Por eso el VALOR no se loguea, no se interpola en ningún mensaje de error y no viaja en ningún
    * `cause`.
    */
   masterPrivateKey: string;
   /**
    * `true` cuando los tres valores de arriba son los placeholders de desarrollo.
    *
-   * Existe para una cosa concreta: la comprobación de arranque que ata dirección y clave
-   * —prevista bajo `src/modules/wallets/infrastructure/`, y hoy inexistente: medido con
-   * `find src/modules/wallets -name '*startup*'`, que no devuelve nada— derivaría la dirección
-   * desde la clave privada, y sobre el placeholder no puede, porque la clave de ceros no es un
-   * escalar válido de secp256k1. Sin este flag habría que elegir entre no hacer esa comprobación nunca o
-   * romper `pnpm start:dev` en un clon recién hecho.
+   * Existe para una cosa concreta, y desde el 2026-08-31 esa cosa **existe**:
+   * `src/modules/wallets/infrastructure/security/master-key-startup.check.ts` deriva la dirección
+   * desde la clave privada al arrancar y la compara con `masterAddress`. Sobre el placeholder no
+   * puede, porque la clave de 64 ceros no es un escalar válido de secp256k1 —cero está fuera del
+   * rango `[1, n-1]`, y `@noble/curves` responde `invalid private key: out of range [1..N-1]`,
+   * medido—, así que ese archivo consulta este flag y se salta la comprobación. Sin el flag habría
+   * que elegir entre no comprobar nunca o romper `pnpm start:dev` en un clon recién hecho.
+   *
+   * (Este JSDoc decía «hoy inexistente», con su `find` de respaldo. Al aterrizar la pieza el
+   * comentario no se quedó obsoleto: se quedó INVERTIDO, negando una protección que sí corre.)
    *
    * No viene de ninguna variable de entorno: es derivado, y por eso no está en la tabla de
    * variables del `.env.example`.

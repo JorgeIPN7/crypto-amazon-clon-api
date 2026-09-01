@@ -32,15 +32,15 @@ const ETHEREUM_ADDRESS = /^0x[0-9a-f]{40}$/;
  *
  * ⚠️ **No valida el checksum EIP-55, y es deliberado.** Lo que eso deja pasar tiene nombre: una
  * dirección MAL TECLEADA que el checksum habría cazado entra como válida, y una transferencia a
- * una dirección inexistente no se puede deshacer. Quien lo tapará es el validador del DTO
- * `is-checksummed-address.validator.ts`, en `infrastructure/http/`, con keccak256 de
- * `@noble/hashes`, y **solo cubrirá lo
- * que entre por HTTP** — el otro origen de direcciones es el proveedor, que las devuelve en
- * minúsculas, es decir sin checksum que comprobar.
+ * una dirección inexistente no se puede deshacer. Quien lo tapa es el validador del DTO
+ * `infrastructure/http/validators/is-checksummed-address.validator.ts`, con keccak256 de
+ * `@noble/hashes`, y **solo cubre lo que entra por HTTP** — el otro origen de direcciones es el
+ * proveedor, que las devuelve en minúsculas, es decir sin checksum que comprobar.
  *
- * ⚠️ **Hoy ese validador NO existe**, así que ahora mismo NADIE comprueba el checksum en todo el
- * sistema: no existe `infrastructure/http/is-checksummed-address.validator.ts` y
- * `@noble/hashes` no está en `package.json` —`grep -c noble package.json` devuelve 0—. Es una decisión pendiente, no una protección activa.
+ * Ese validador **ya existe** (desde 2026-08-31; una versión anterior de este comentario decía lo
+ * contrario y se quedó invertida al aterrizar la pieza). La garantía sigue siendo parcial y
+ * conviene no leerla de más: cubre el borde HTTP, no este value object, así que una dirección
+ * construida desde `application/` o desde un test entra sin checksum comprobado.
  *
  * Por qué no aquí, en dos hechos medidos y no supuestos:
  * - `node:crypto` no trae keccak256: `getHashes().filter(h => /keccak/i.test(h))` devuelve 0

@@ -42,3 +42,19 @@ docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:15180
 docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:15395
 docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:17261
 docs/plans/2026-08-27-ethereum-gas-pump-wallets.md:generic-api-key:17272
+
+# ── Ejemplos de OpenAPI en `wallets.controller.ts` ─────────────────────────────
+#
+# Dos direcciones de contrato ERC-20 dentro de los `example` que el guardián del contrato EXIGE
+# publicar. Disparan `generic-api-key` por la misma razón de siempre: la clave `tokenAddress`
+# contiene la palabra `token` y el valor tiene entropía de dirección.
+#
+# ⚠️ **Aquí no se puede aplicar el remedio de arriba —renombrar para quitar la palabra clave—
+# porque `tokenAddress` es el nombre PUBLICADO del campo**, el mismo que el cliente manda y el
+# mismo que el proveedor espera. Renombrarlo rompería el contrato para ahorrarle un falso positivo
+# a un escáner. En los specs sí se renombra, y se ha hecho: ahí la constante se llama `CONTRACT`.
+#
+# El valor es una dirección Ethereum, o sea información pública por construcción: se deriva de una
+# clave pública y se publica en cada transacción.
+src/modules/wallets/infrastructure/http/wallets.controller.ts:generic-api-key:397
+src/modules/wallets/infrastructure/http/wallets.controller.ts:generic-api-key:408
