@@ -18,6 +18,7 @@ import {
   WalletOwnerGoneError,
   WalletOwnerMismatchError,
   WalletProviderRejectedError,
+  WalletProviderRevertedError,
   WalletProviderUnreachableError,
 } from '../../../domain/errors/wallet.errors';
 import {
@@ -108,8 +109,8 @@ describe('TransferAssetUseCase', () => {
     });
 
     it('debería registrar rejected con el código del proveedor y propagar el error', async () => {
-      // Arrange: el 400 de validación del cuerpo es el ÚNICO rechazo que significa «no pasó nada
-      // en la cadena» (spec §3.2).
+      // Arrange: el 400 de validación del cuerpo es UNA de las dos respuestas que significan «no
+      // pasó nada en la cadena» (spec §3.2). La otra la fija el caso de la reversión, justo debajo.
       const rejection = new WalletProviderRejectedError('body-rejected', 400);
       const { useCase, ledger, gateway } = buildUseCase([buildWallet({ status: 'active' })]);
       gateway.programSend(rejection);
@@ -123,6 +124,34 @@ describe('TransferAssetUseCase', () => {
       // transacción es dinero movido dos veces— pero nada lo comprobaba: medido envolviendo la
       // llamada en un `try/catch` que reintenta, la suite del módulo pasaba ENTERA y el gate de
       // mutación seguía sin supervivientes nuevos, porque Stryker no genera ese mutante.
+      expect(gateway.sendCalls).toHaveLength(1);
+    });
+
+    // ⚠️ **La segunda rama del `if`, y la razón de que el `if` enumere dos clases.** Hasta el
+    // 2026-09-02 la reversión caía por el `else` —es un `WalletProviderError` como cualquier otro—
+    // y la fila decía `unknown`, o sea «pudo minarse o no» sobre algo que revirtió en simulación.
+    //
+    // ⚠️ **Este caso mata CERO mutantes atribuidos y es el único control de ese defecto**, igual
+    // que el de «enviar desde la dirección de la wallet» de arriba y por la misma razón: Stryker no
+    // tiene mutador que BORRE un operando de un `||`. Medido dos veces el 2026-09-02:
+    //  · El informe por test lo imprime como `~ … (covered 31)` — los 31 que cubre los mata antes
+    //    otro caso, y el score del archivo se queda en 98.04 % con o sin él.
+    //  · Dejando el `if` con solo `WalletProviderRejectedError` —o sea, deshaciendo la corrección—
+    //    la suite del módulo tumba **este caso y ninguno más** (470 → 1 failed), y el E2E tumba el
+    //    suyo, que ve la misma mentira desde PostgreSQL: 409 correcto y fila en `unknown`.
+    it('debería registrar rejected, y no unknown, cuando la cadena revirtió la operación', async () => {
+      // Arrange
+      const reverted = new WalletProviderRevertedError('chain-reverted', 403);
+      const { useCase, ledger, gateway } = buildUseCase([buildWallet({ status: 'active' })]);
+      gateway.programSend(reverted);
+
+      // Act + Assert
+      await expect(useCase.execute(TRANSFER_INPUT)).rejects.toBe(reverted);
+      expect(ledger.saveCalls.at(-1)?.status).toBe('rejected');
+      expect(ledger.saveCalls.at(-1)?.reasonCode).toBe('chain-reverted');
+      expect(ledger.saveCalls.at(-1)?.txId).toBeNull();
+      // Una reversión tampoco se reintenta: el estado que la causó no cambia por repetir, y cada
+      // intento son dos créditos.
       expect(gateway.sendCalls).toHaveLength(1);
     });
 
@@ -340,16 +369,17 @@ describe('TransferAssetUseCase', () => {
     // mismo que las de `assign-wallet.use-case.spec.ts` y `find-wallet-by-owner.use-case.spec.ts`:
     // `@fast-check/jest` mete la semilla DENTRO del nombre del test y `stryker.config.mjs` usa
     // `coverageAnalysis: perTest`, que empareja por nombre. La propiedad EXPLORA; quien ancla cada
-    // rama son los diecisiete casos puntuales de arriba (backlog #18).
+    // rama son los dieciocho casos puntuales de arriba (backlog #18).
     //
     // ⚠️ Y aun escrita así, el informe por test **no le atribuye ninguna muerte**, que no es lo
     // mismo que «no puede matar»: Stryker atribuye cada mutante al primer test que lo mata, y
-    // aquí llegan antes los diecisiete casos puntuales. Medido en
+    // aquí llegan antes los dieciocho casos puntuales. Medido en
     // `list-wallet-transfers.use-case.spec.ts` poniendo los puntuales en `it.skip`: la propiedad
     // pasa a `killed 2`. La conclusión útil sigue siendo la misma —anclar cada rama con un caso
-    // puntual— pero por el motivo correcto. Ver `docs/backlog.md` #18. Medido: `~ … (covered
-    // 35)`, el número más alto de los dieciocho. No es que sobre —es la única aserción que recorre
-    // los tres desenlaces con la misma pregunta—, es que los 35 mutantes que toca ya los mató un
+    // puntual— pero por el motivo correcto. Ver `docs/backlog.md` #18. Medido de nuevo el
+    // 2026-09-02, con la reversión ya dentro del sorteo: `~ … (covered 36)`, el número más alto de
+    // los diecinueve —eran 35 sobre dieciocho—. No es que sobre —es la única aserción que recorre
+    // las cuatro respuestas con la misma pregunta—, es que los 36 mutantes que toca ya los mató un
     // caso puntual anterior. Confirma la regla en vez de contradecirla: explorar no es anclar.
     it('debería escribir siempre la primera fila en submitting, sea cual sea el desenlace (propiedad)', async () => {
       await fc.assert(
@@ -371,22 +401,28 @@ describe('TransferAssetUseCase', () => {
 
 // Helpers
 
-type ProviderOutcome = 'submitted' | 'rejected' | 'unknown';
+type ProviderOutcome = 'submitted' | 'rejected' | 'reverted' | 'unknown';
 
-const outcomeArb = fc.constantFrom<ProviderOutcome>('submitted', 'rejected', 'unknown');
+const outcomeArb = fc.constantFrom<ProviderOutcome>('submitted', 'rejected', 'reverted', 'unknown');
 
 /**
- * Los tres desenlaces del proveedor, cada uno con su representante canónico: el hash del 200, el
- * ÚNICO 400 que significa «no pasó nada en la cadena» y el timeout, que es el ejemplo de «pudo
- * minarse o no». No hay un cuarto: un `Error` sin traducir no es un desenlace del proveedor sino
- * un defecto nuestro, y por eso lo cubre un caso puntual y no esta propiedad.
+ * Las CUATRO respuestas del proveedor, cada una con su representante canónico: el hash del 200, el
+ * 400 que rechaza el cuerpo, el 403 en el que la cadena revirtió —las dos que significan «no pasó
+ * nada en la cadena», y que acaban en el MISMO estado `rejected` por dos caminos distintos del
+ * `if`— y el timeout, que es el ejemplo de «pudo minarse o no».
+ *
+ * No hay una quinta: un `Error` sin traducir no es una respuesta del proveedor sino un defecto
+ * nuestro, y por eso lo cubre un caso puntual y no esta propiedad.
  */
 const programmedOutcome = (outcome: ProviderOutcome): TransactionHash | Error => {
   if (outcome === 'submitted') {
     return TransactionHash.from(TRANSFER_TX);
   }
-  return outcome === 'rejected'
-    ? new WalletProviderRejectedError('body-rejected', 400)
+  if (outcome === 'rejected') {
+    return new WalletProviderRejectedError('body-rejected', 400);
+  }
+  return outcome === 'reverted'
+    ? new WalletProviderRevertedError('chain-reverted', 403)
     : new WalletProviderUnreachableError('timeout', null);
 };
 
@@ -395,8 +431,8 @@ const programmedOutcome = (outcome: ProviderOutcome): TransactionHash | Error =>
  * `super`, exactamente como `assign-wallet.use-case.spec.ts` y por el mismo motivo medido allí:
  * `jest.spyOn(...).mockImplementation()` SUSTITUYE el cuerpo del fake, así que el caso del orden
  * dejaría de escribir `saveCalls` y el almacén, y ninguna otra aserción de ese caso podría
- * asomarse a esas listas. Delegando, un solo `buildUseCase` sirve para los dieciocho casos y el
- * diario sale gratis en los otros diecisiete.
+ * asomarse a esas listas. Delegando, un solo `buildUseCase` sirve para los diecinueve casos y el
+ * diario sale gratis en los otros dieciocho.
  *
  * ⚠️ **El diario anota solo las DOS operaciones que la escritura por delante ordena entre sí** —el
  * guardado del libro y la llamada—, y no el directorio, la lectura de la wallet o

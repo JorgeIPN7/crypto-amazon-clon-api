@@ -428,16 +428,17 @@ export class WalletsController {
     example: { success: true, data: TRANSFER_EXAMPLE, request: requestMeta(TRANSFERS_PATH) },
   })
   // El límite que publica el ⚠️ de abajo no es una observación nueva: lo midió `tatum-http.client.ts`
-  // y vive en el JSDoc de su `translateStatus` («su 400 no distingue "dirección destino inválida"
-  // de "la master no tiene fondos"»). Se publica aquí porque es el único endpoint donde el cliente
-  // lo ve, y afinarlo exige clasificar el cuerpo del proveedor (§9 del spec).
+  // y vive en el JSDoc de su `translateStatus`. ⚠️ **Es la MITAD que queda de `docs/backlog.md` #10**:
+  // la otra —el 403, que publicaba una precondición de negocio como caída de la integración— se
+  // cerró el 2026-09-02 y hoy sale como el 409 de aquí abajo. Se publica aquí porque este es el
+  // único endpoint donde el cliente lo ve.
   @ApiBadRequestResponse({
     description:
       'El cuerpo no supera la validación de entrada, el dominio rechaza la combinación de ' +
       'campos para esa clase de activo, o el proveedor rechazó el cuerpo. ⚠️ Límite reconocido: ' +
-      'el proveedor devuelve el mismo error cuando el destinatario es inválido —culpa del ' +
-      'cliente— y cuando la master no tiene fondos —culpa nuestra—, así que algunos 503 salen ' +
-      'hoy como 400.',
+      'el `errorCode` de su 400 es el mismo (`validation.failed`) cuando el destinatario es ' +
+      'inválido —culpa del cliente— y cuando la master no tiene fondos —culpa nuestra—, así que ' +
+      'algunos 503 salen hoy como 400.',
     type: ValidationErrorResponseDto,
     example: errorExample(
       400,
@@ -447,7 +448,11 @@ export class WalletsController {
   })
   @ApiConflictResponse({
     description:
-      'La dirección todavía no está activa, o el rol admin ha intentado enviar desde la master.',
+      'La dirección todavía no está activa, el rol admin ha intentado enviar desde la master, o ' +
+      'la cadena revirtió la operación. ⚠️ Este último caso NO es un fallo de la integración: la ' +
+      'transacción no se minó y la fila del libro queda en `rejected`. La reversión que hemos ' +
+      'observado es una dirección sin saldo suficiente, pero el proveedor no desglosa el motivo, ' +
+      'así que la respuesta solo afirma lo que se sabe.',
     type: ErrorResponseDto,
     example: errorExample(409, WALLET_NOT_ACTIVATED_EXAMPLE, TRANSFERS_PATH),
   })

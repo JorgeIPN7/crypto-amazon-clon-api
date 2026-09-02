@@ -169,17 +169,32 @@ Quien lo olvide se dejará fuera precisamente la que tiene los fondos de gas.
 el libro en algo útil: con la escritura posterior, un timeout no dejaría rastro — que es justo el
 caso para el que existe.
 
-| Estado       | Cuándo                                                                               | Qué sabemos                                                  |
-| ------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| `submitting` | Fila escrita, antes de la llamada                                                    | Nada aún                                                     |
-| `submitted`  | El proveedor devolvió `txId`                                                         | La transacción está enviada, no necesariamente minada        |
-| `rejected`   | El proveedor rechazó **el cuerpo** con un 400                                        | **No pasó nada en la cadena.** Se guarda un código de motivo |
-| `unknown`    | Timeout, red caída, 5xx, o un fallo de nuestra cuenta con el proveedor (401/403/4xx) | ⚠️ **Pudo minarse o no**                                     |
+| Estado       | Cuándo                                                                            | Qué sabemos                                                  |
+| ------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `submitting` | Fila escrita, antes de la llamada                                                 | Nada aún                                                     |
+| `submitted`  | El proveedor devolvió `txId`                                                      | La transacción está enviada, no necesariamente minada        |
+| `rejected`   | El 400 del cuerpo, o el 403 con `errorCode: "sc.operation.failed"`                | **No pasó nada en la cadena.** Se guarda un código de motivo |
+| `unknown`    | Timeout, red caída, 5xx, o un fallo de nuestra cuenta (401, 403 de permisos, 4xx) | ⚠️ **Pudo minarse o no**                                     |
 
-⚠️ **`rejected` es solo el 400 de validación del cuerpo.** Un 401 o un 403 no son un rechazo del
-envío: nadie rechazó nada, la petición ni siquiera se procesó como transferencia. Meterlos en
-`rejected` haría que la fila afirmara algo falso, así que van a `unknown` — que es literalmente lo
-que sabemos.
+⚠️ **El criterio de `rejected` es «no pasó nada en la cadena», no un status concreto.** Enmienda
+del 2026-09-02: esta sección decía «`rejected` es solo el 400 de validación del cuerpo», que era la
+descripción del único caso conocido colada como definición. Hoy lo cumplen dos respuestas: ese 400,
+donde nadie llegó a ejecutar nada, y el 403 con `errorCode: "sc.operation.failed"`, que es una
+reversión en simulación —`execution reverted`— medida contra Sepolia real.
+
+⚠️ **Un 401 o un 403 de permisos siguen yendo a `unknown`, y no porque «no pasara nada»**: es que
+de esas respuestas no tenemos ninguna evidencia sobre la cadena, mientras que del 403 de reversión
+sí la tenemos, porque el proveedor la nombra. La diferencia entre los dos 403 no es la culpa, es la
+EVIDENCIA. Ante la duda, `unknown`: lo caro es afirmar que no se movió nada cuando pudo moverse.
+
+> **Enmienda del 2026-09-02 — el criterio de `rejected` no era el status.** El párrafo de arriba
+> describía el único caso conocido al escribirlo y lo dejaba escrito como si fuera la regla. La regla
+> es **«no pasó nada en la cadena»**, y hoy la cumplen dos respuestas: ese 400 y el **403 con
+> `errorCode: "sc.operation.failed"`**, que es una reversión en simulación (`execution reverted`,
+> medido contra Sepolia al transferir sin saldo). Ese 403 pasa además de **503** —que afirmaba una
+> caída del proveedor que no existía— a **409**, y su motivo es el décimo de la lista cerrada,
+> `chain-reverted`. Un 401, o un 403 de permisos, siguen yendo a `unknown` exactamente por lo que
+> dice el párrafo. El detalle, y la mitad del 400 que sigue abierta, en `docs/backlog.md` #10.
 
 ⚠️ **El «motivo» es un código propio de una lista cerrada, NUNCA el `message` del proveedor.** No es
 purismo: el mensaje del 401 de Tatum interpola la clave —
@@ -282,6 +297,7 @@ capturaría errores de otros contextos.
 | `WalletOwnerGoneError`                                                                                                                                          | **403**, construido con el string canónico como en `orders`                                                      |
 | `AddressIndexAlreadyUsedError`, `WalletAddressAlreadyUsedError`, `WalletOwnerMismatchError`, `WalletAddressIsMasterError`, `WalletAssignmentLostError`          | **500**: violaciones de invariante o configuración rota, no errores del cliente. Con 5xx, `ErrorReporter` los ve |
 | `WalletProviderRejectedError`                                                                                                                                   | **400**, solo en la transferencia (ver §7.2)                                                                     |
+| `WalletProviderRevertedError` (enmienda del 2026-09-02)                                                                                                         | **409**, solo en la transferencia: la cadena revirtió, no es una caída (ver §7.2)                                |
 | `WalletProviderUnreachableError`                                                                                                                                | **502**                                                                                                          |
 | `WalletProviderUnavailableError`                                                                                                                                | **503**                                                                                                          |
 
@@ -651,6 +667,7 @@ semanal, no en el PR.
 | 400 en **derivar o activar**                                                   | Configuración **nuestra**: esos cuerpos los construimos enteros                | **503**      | sí       |
 | 401                                                                            | **Nuestra API key** está muerta o el plan caducó                               | **503**      | sí       |
 | 403                                                                            | Permisos **nuestros**… o un error lógico del proveedor. Ver el límite de abajo | **503**      | sí       |
+| 403 con `errorCode: "sc.operation.failed"`, **solo en la transferencia**       | La cadena **revirtió** la operación: no se minó nada (enmienda del 2026-09-02) | **409**      | no       |
 | Cualquier otro 4xx **no documentado** (404, 429, 402, 409…)                    | No forma parte de su contrato publicado                                        | **503**      | sí       |
 | 5xx, DNS/TCP/TLS, timeout, cuerpo no-JSON, **200 que no satisface el esquema** | Proveedor caído o contrato roto                                                | **502**      | sí       |
 
@@ -672,6 +689,15 @@ las siete operaciones, es _«Forbidden. The request is authenticated, but it is 
 perform the operation due to **logical error** or invalid permissions»_. Mapearlo entero a 503
 publica una precondición de negocio del proveedor —por ejemplo, la dirección no activada— como caída
 de la integración. Afinarlo exige clasificar su cuerpo, y es trabajo del ciclo siguiente.
+
+> **Enmienda del 2026-09-02 — ese ciclo siguiente ocurrió, y cerró este límite (no el del 400).**
+> El discriminador es `errorCode: "sc.operation.failed"`, medido en una respuesta REAL de Sepolia
+> —no en su `openapi.json`, donde ni siquiera aparece y cuyo `Error403` no declara `errorCode`—. De
+> ese cuerpo se lee `errorCode` y **nada más**: `message` y `cause` no se leen ni para clasificar,
+> porque el `message` del 401 interpola la API key, y lo garantiza el tipo (`isChainRevert` devuelve
+> `boolean`). La reclasificación corre **solo con `blame: 'client-input'`**, o sea solo en la
+> transferencia: una reversión al derivar o al activar la pagaría la master y es nuestra, así que se
+> queda en el 503 de la fila de arriba y sigue llegando al APM.
 
 ⚠️ **El 401 del proveedor no puede salir como 401 nuestro.** Nuestro 401 tiene un significado
 publicado y estrecho: `@Auth()` lo adjunta con «Token ausente, inválido o expirado». Devolverlo
@@ -783,6 +809,9 @@ que debe responder 400 sin gastar créditos.
   400 no distingue «dirección del destinatario inválida» de «la master no tiene fondos», y el 403
   incluye literalmente _«logical error or invalid permissions»_— así que hasta el ciclo siguiente
   **algunos 503 saldrán como 400 y alguna precondición de negocio saldrá como caída del proveedor**.
+  > **Enmienda del 2026-09-02:** la segunda mitad ya no es cierta. El 403 con
+  > `errorCode: "sc.operation.failed"` de la transferencia sale como **409** y su fila queda en
+  > `rejected`; del cuerpo se lee ese código y nada más. La primera mitad sigue en pie tal cual.
 - **No** se escribe por delante en la activación, a diferencia de la transferencia. Si el proceso
   muere entre la llamada y el guardado, el reintento **vuelve a activar** y el gas se quema dos
   veces. Hoy son créditos de testnet; ⚠️ **es bloqueante para mainnet**, y así queda anotado en el

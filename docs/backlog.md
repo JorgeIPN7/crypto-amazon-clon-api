@@ -269,10 +269,10 @@ existir, y ninguna petición al proveedor lleva una clave privada en el cuerpo.
 
 ---
 
-## 10. Los 400 y 403 del proveedor son ambiguos y se traducen en bloque
+## 10. El 400 del proveedor sigue siendo ambiguo — la mitad del 403, CERRADA (2026-09-02)
 
-**Qué pasa.** El adaptador clasifica los errores del proveedor por código HTTP, sin mirar el cuerpo,
-y los dos códigos de cliente son ambiguos por diseño:
+**Qué pasa.** El adaptador clasificaba los errores del proveedor por código HTTP, sin mirar el
+cuerpo, y los dos códigos de cliente son ambiguos por diseño:
 
 - El `400` llega con `errorCode: "validation.failed"` tanto si la dirección del destinatario es
   inválida —culpa del cliente, 400 correcto— como si la master no tiene fondos —culpa nuestra,
@@ -282,14 +282,34 @@ y los dos códigos de cliente son ambiguos por diseño:
   logical error or invalid permissions»_. Mapearlo entero a 503 publica una precondición de negocio
   del proveedor como caída de la integración.
 
-**Criterio ya decidido.** Se acepta y **se escribe en el spec** en lugar de fingir que la tabla de
-traducción es exacta: hasta que esto se cierre, algunos 503 salen como 400 y alguna precondición de
-negocio sale como caída. Afinarlo exige leer y clasificar el array `data[]` del 400 y el
-`errorCode`/`message` del 403, lo que ata el adaptador a cadenas del proveedor que pueden cambiar
-sin aviso — por eso no se hizo a la primera.
+**Lo que se cerró, y por qué se pudo.** Una transferencia sin saldo contra Sepolia devolvió, medido
+el 2026-09-02, un `403` con `errorCode: "sc.operation.failed"` y un `cause` que decía
+`execution reverted: Address: insufficient balance`. Con ese discriminador:
 
-⚠️ Lo que se clasifique **nunca** puede acabar en un mensaje ni en una propiedad de error: el
-mensaje del 401 del proveedor interpola la API key.
+| Antes                                    | Ahora                                                       |
+| ---------------------------------------- | ----------------------------------------------------------- |
+| **503** «the integration is unavailable» | **409**, como los demás conflictos de estado del módulo     |
+| Fila del libro en `unknown`, `forbidden` | Fila en `rejected`, motivo **`chain-reverted`** (el décimo) |
+
+Las dos afirmaciones anteriores eran falsas: el proveedor no estaba caído —contestó, y bien— y
+`execution reverted` significa que **no se minó nada**, que es justo lo que `unknown` niega saber.
+
+⚠️ **Del cuerpo se lee `errorCode` y NADA MÁS**, y lo garantiza el tipo: `isChainRevert`
+(`tatum-http.client.ts`) devuelve un `boolean`, así que ninguna cadena del proveedor puede salir de
+ahí hacia un error, una fila o un log. `message` y `cause` no se leen ni para clasificar.
+⚠️ **Solo se reclasifica donde la culpa es del cliente** (`blame: 'client-input'`, o sea la
+transferencia): una reversión al derivar o al activar sería nuestra —el gas lo paga la master— y
+sigue saliendo 503, que es lo único que llega al `ErrorReporter`.
+⚠️ **`sc.operation.failed` NO está en el `openapi.json` del proveedor** —medido: cero coincidencias,
+y su esquema `Error403` ni siquiera declara `errorCode`—. Sale de una respuesta real, así que puede
+cambiar sin aviso; si deja de casar se vuelve al 503 de antes, que es ruidoso pero no miente.
+
+**Lo que queda abierto: el 400.** Su `errorCode` es el mismo para las dos culpas, así que leerlo no
+decide nada y algunos 503 siguen saliendo como 400. Afinarlo exige clasificar su array `data[]`,
+que ata el adaptador a cadenas del proveedor con mucha menos estabilidad que un código.
+⚠️ **No medido:** que una master sin fondos produzca ese 400 viene de la redacción original de esta
+entrada, no de una prueba contra la cadena. La única falta de fondos observada de verdad salió por
+el 403.
 
 **Cómo se sabrá que está hecho.** Un 400 por fondos insuficientes de la master sale como 503 y
 aparece en el `ErrorReporter`; uno por destinatario inválido sigue saliendo como 400 y no aparece.
@@ -408,6 +428,16 @@ la garantía no está en el dominio.
 suite daba **173 muertos y 0 errores**. Los mutantes son los mismos; lo que cambió es su
 clasificación. Reparto exacto: `ethereum-address.vo.ts` 5, `transaction-hash.vo.ts` 5,
 `address-index.vo.ts` 4.
+
+⚠️ **Ese reparto suma 14 y no 17, así que era PARCIAL presentado como exacto.** Vuelto a medir el
+2026-09-02 con el motivo `chain-reverted` ya dentro —`--mutate
+"src/modules/wallets/domain/**/*.ts,src/modules/wallets/application/**/*.ts"`—: los tres que faltaban
+están en `wallet.errors.ts`, y el total de errores sigue siendo **17** con el mismo reparto en los
+value objects. Lo que sí se movió es la otra columna: **242 muertos + 5 timeouts** en `domain/`
+frente a los 245 muertos de arriba. Los dos mutantes de más son los de la clase nueva; **no está
+medido** si los 5 timeouts los provoca ella o son variación de la máquina, porque comprobarlo exigía
+revertir el árbol para correr el baseline. El score del ámbito sale **99.73 %** (umbral 85) y los
+timeouts cuentan como muertos, así que el gate no se ve afectado por ninguna de las dos cosas.
 
 **La causa, medida y no supuesta.** Ese spec construye **siete** value objects, de **cuatro**
 clases distintas, a nivel de módulo y fuera de todo `describe` — contadas con
@@ -617,5 +647,36 @@ value: undefined` —el `init()` ya no rechaza, así que no hay error que captur
 resolver la comprobación de arranque de la clave de la master», con
 `Nest could not find MasterKeyStartupCheck element`. El primero es el que afirma la garantía; el
 segundo solo el registro, y se queda porque falla antes y nombra la línea que falta.
+
+---
+
+## 21. `rehydrate` acepta cualquier cadena en `reason_code`, y el esquema no lo cierra
+
+**Qué pasa.** `ProviderFailureReason` es una lista cerrada de diez códigos y el TIPO cierra el
+camino de ESCRITURA: `markRejected` y `markUnknown` no aceptan un `string`, medido —pasar
+`error.message` no compila—. Pero `WalletTransfer.rehydrate` recibe el valor de la FILA, y ahí el
+tipo es una aserción del mapper, no una comprobación.
+
+Medido: pasando el propio mensaje del 401 del proveedor —el que interpola la clave de API— con un
+`as ProviderFailureReason`, `toSnapshot().reasonCode` lo devuelve **verbatim**. Ni valida, ni
+normaliza, ni recorta. Y esa columna se publica por `GET /wallets/me/transfers`.
+
+**Qué NO es.** No hay fuga viva: nada del árbol escribe ahí un texto libre. El camino requiere una
+escritura por SQL crudo, o un mapper futuro que haga ese `as` sobre algo que no venga de la lista.
+
+**Criterio ya decidido.** La migración **declina** poner un
+`CHECK` sobre esa columna, y su cabecera lo argumenta: duplicar la lista en el esquema obliga a
+tocarla cada vez que crece —ya creció una vez, de nueve a diez, al añadir `chain-reverted`— y una
+lista que hay que mantener en dos sitios diverge. Se acepta mientras el único escritor sea el
+mapper.
+
+⚠️ **Lo que cambia el cálculo es un segundo escritor.** El día que algo distinto del mapper escriba
+esa columna —una importación, un script de corrección, otro servicio—, el tipo deja de ser
+suficiente y el `CHECK` pasa a ser lo único. Medido: el único `CHECK` del esquema hoy es
+`ck_wallets_address_not_master`.
+
+**Cómo se sabrá que está hecho.** Cuando exista una migración con
+`CHECK (reason_code IS NULL OR reason_code IN (…los diez…))`, o cuando se decida por escrito
+que el tipo basta para siempre.
 
 ---

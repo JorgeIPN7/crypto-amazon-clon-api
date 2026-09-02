@@ -106,7 +106,11 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * `reason_code` a `PROVIDER_FAILURE_REASONS`, porque `WalletTransfer.rehydrate` acepta cualquier
  * cadena que le pase el mapper con un `as`. Se deja fuera porque el contrato congelado §8 declara
  * para esa tabla la clave primaria y el índice compuesto y ningún `CHECK`, y porque una lista de
- * nueve literales duplicada en el esquema envejece sin que nadie la mire al añadir el décimo. La
+ * nueve literales duplicada en el esquema envejece sin que nadie la mire al añadir el décimo.
+ * ⚠️ **El décimo llegó el 2026-09-02** (`chain-reverted`, la reversión de la cadena): la mitad del
+ * argumento que se acaba de leer ya está comprobada —la lista crece— y la otra mitad sigue siendo
+ * la decisión, o sea que la columna sigue admitiendo cualquier cadena. La deuda está en
+ * `docs/backlog.md` **#21**; esta migración no se toca, porque cerrarla es una migración nueva. La
  * exclusión mutua de las cuatro columnas del activo tampoco se declara: la garantía la da
  * `TransferAsset`, que es el único camino de escritura.
  *

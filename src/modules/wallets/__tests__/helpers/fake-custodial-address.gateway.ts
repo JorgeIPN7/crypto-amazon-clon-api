@@ -32,11 +32,13 @@ export type RecordedSendCommand = {
  * escribe que un `200` sin el campo `activated` se traduce a `WalletProviderUnreachableError` antes
  * de que el dominio lo vea: si el fake no supiera fallar aquí, ese camino no tendría doble.
  *
- * **Puede fallar de las nueve formas de `PROVIDER_FAILURE_REASONS`** —medido: la lista de
- * `domain/errors/wallet.errors.ts` tiene nueve elementos— sin enumerar ninguna: los cuatro
- * `program*` aceptan cualquier `Error`, así que el test pasa el `WalletProviderRejectedError`,
+ * **Puede fallar de las diez formas de `PROVIDER_FAILURE_REASONS`** —medido: la lista de
+ * `domain/errors/wallet.errors.ts` tiene diez elementos desde que `chain-reverted` entró el
+ * 2026-09-02— sin enumerar ninguna: los cuatro `program*` aceptan cualquier `Error`, así que el
+ * test pasa el `WalletProviderRejectedError`, `WalletProviderRevertedError`,
  * `WalletProviderUnreachableError` o `WalletProviderUnavailableError` que quiera, con su motivo y
- * su status. Enumerarlos aquí duplicaría la lista cerrada y la dejaría divergir en silencio.
+ * su status. Enumerarlos aquí duplicaría la lista cerrada y la dejaría divergir en silencio — que
+ * es justo lo que ese décimo motivo habría exigido tocar.
  *
  * ⚠️ **Las tres listas de índices se escriben ANTES de decidir si la llamada falla**, y eso es lo
  * que separa «no se llamó» de «se llamó y falló»: sin ello, un caso de uso que ni siquiera invoca

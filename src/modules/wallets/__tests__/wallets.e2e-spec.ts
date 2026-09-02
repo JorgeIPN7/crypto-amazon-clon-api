@@ -562,6 +562,50 @@ describe('Wallets (e2e)', () => {
       expect(JSON.stringify(response.body)).not.toContain(providerMessage);
     });
 
+    // ⚠️ El cuerpo es el que Sepolia devolvió DE VERDAD el 2026-09-02 al transferir sin saldo,
+    // copiado literal. Es el caso que este ciclo corrige: antes salía 503 —«la integración está
+    // caída», que era falso: el proveedor contestó— con la fila en `unknown` —«pudo minarse o no»,
+    // que también era falso: `execution reverted` significa que no se minó nada—.
+    //
+    // Que las dos aserciones MIDEN está comprobado rompiendo el código: quitando el
+    // `blame === 'client-input' && await isChainRevert(response)` de `translateError`
+    // (`tatum-http.client.ts`) este caso es el único rojo del archivo, con 503 en vez de 409; y
+    // dejando el `if` del caso de uso con solo `WalletProviderRejectedError`, el status sigue en 409
+    // y lo que cae es la fila, con `unknown` en vez de `rejected`.
+    it('debería responder 409 y dejar la fila en rejected cuando la cadena revierte la transferencia', async () => {
+      // Arrange
+      await giveActivatingWallet(userToken);
+      stubActivationCheck(true);
+      const providerMessage =
+        'Unable to transfer assets. Please check, that your address contains all the tokens you want to transfer.';
+      stub.stub('POST', '/v3/blockchain/sc/custodial/transfer', {
+        status: 403,
+        body: {
+          statusCode: 403,
+          errorCode: 'sc.operation.failed',
+          message: providerMessage,
+          cause: 'Returned error: execution reverted: Address: insufficient balance',
+        },
+      });
+
+      // Act
+      const response = await postTransfer(userToken, NATIVE_TRANSFER);
+
+      // Assert
+      expect(response.status).toBe(409);
+      const rows = await dataSource.query<TransferRow[]>(
+        'SELECT status, tx_id, reason_code FROM wallet_transfers',
+      );
+      expect(rows).toEqual([{ status: 'rejected', tx_id: null, reason_code: 'chain-reverted' }]);
+      // Del cuerpo del proveedor se lee `errorCode` y nada más: ni su `message` ni su `cause`
+      // pueden acabar en la fila —que se publica por `GET /wallets/me/transfers`— ni en la
+      // respuesta.
+      expect(JSON.stringify(rows)).not.toContain(providerMessage);
+      expect(JSON.stringify(rows)).not.toContain('insufficient balance');
+      expect(JSON.stringify(response.body)).not.toContain(providerMessage);
+      expect(JSON.stringify(response.body)).not.toContain('insufficient balance');
+    });
+
     it('debería responder 400 sin llamar al proveedor cuando el checksum EIP-55 del destinatario está roto', async () => {
       // Arrange
       await giveActivatingWallet(userToken);

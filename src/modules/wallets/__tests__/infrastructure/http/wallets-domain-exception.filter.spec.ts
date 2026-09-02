@@ -27,6 +27,7 @@ import {
   WalletOwnerGoneError,
   WalletOwnerMismatchError,
   WalletProviderRejectedError,
+  WalletProviderRevertedError,
   WalletProviderUnavailableError,
   WalletProviderUnreachableError,
 } from '../../../domain/errors/wallet.errors';
@@ -143,6 +144,30 @@ describe('WalletsDomainExceptionFilter', () => {
       expect(() => filter.catch(new WalletProviderRejectedError('body-rejected', 400))).toThrow(
         BadRequestException,
       );
+    });
+
+    // ⚠️ **409 y no 503**, que es donde caía hasta el 2026-09-02. El proveedor contestó y contestó
+    // bien: lo que impide la operación es el estado de la wallet, y sobre eso el cliente SÍ puede
+    // actuar. Con 503 le decíamos «reintenta más tarde» y reintentaría para siempre.
+    it('debería traducir WalletProviderRevertedError a 409 con su mensaje fijo', () => {
+      // Arrange
+      const filter = new WalletsDomainExceptionFilter();
+
+      // Act
+      const thrown = captureError(() =>
+        filter.catch(new WalletProviderRevertedError('chain-reverted', 403)),
+      );
+
+      // Assert
+      expect(thrown).toBeInstanceOf(ConflictException);
+      expect(thrown.message).toBe('The blockchain reverted the transfer');
+      // Publicar el mensaje solo es seguro porque es FIJO. El código de motivo es diagnóstico
+      // interno y no viaja, igual que en el 502 y el 503.
+      expect(thrown.message).not.toContain('chain-reverted');
+      expect((thrown as ConflictException).getResponse()).toMatchObject({
+        statusCode: 409,
+        error: 'Conflict',
+      });
     });
 
     it('debería traducir WalletProviderUnreachableError a 502', () => {

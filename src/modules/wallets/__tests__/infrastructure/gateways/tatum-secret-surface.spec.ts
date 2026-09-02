@@ -70,6 +70,39 @@ const SCENARIOS: Scenario[] = [
     respond: () => Promise.resolve(jsonResponse(400, { message: 'bad request' })),
     act: (gateway) => gateway.send(transferCommand()),
   },
+  /**
+   * ⚠️ **Los dos escenarios de abajo son los del único camino que LEE el cuerpo de un error**
+   * (`isChainRevert`, desde el 2026-09-02), y por eso son los únicos donde el secreto viaja en la
+   * RESPUESTA y no en la petición. Uno por rama: con el `errorCode` que casa —se construye
+   * `WalletProviderRevertedError`— y sin él —se cae a la traducción por status—. El cuerpo del
+   * primero es el `message` real del 401 del proveedor metido en un 403: es el que interpola la
+   * clave de API, medido en `docs/tatum/gas-pump/openapi.json`.
+   */
+  {
+    label: 'la transferencia responde un 403 de reversión con la clave de API en el mensaje',
+    respond: () =>
+      Promise.resolve(
+        jsonResponse(403, {
+          statusCode: 403,
+          errorCode: 'sc.operation.failed',
+          message: `Unable to find valid subscription for '${FAKE_API_KEY}'`,
+          cause: 'Returned error: execution reverted: Address: insufficient balance',
+        }),
+      ),
+    act: (gateway) => gateway.send(transferCommand()),
+  },
+  {
+    label: 'la transferencia responde un 403 que ecoa la clave privada de la master',
+    respond: () =>
+      Promise.resolve(
+        jsonResponse(403, {
+          statusCode: 403,
+          errorCode: 'permission.denied',
+          message: `Rejected fromPrivateKey ${FAKE_MASTER_PRIVATE_KEY}`,
+        }),
+      ),
+    act: (gateway) => gateway.send(transferCommand()),
+  },
   {
     label: 'la transferencia responde 500',
     respond: () => Promise.resolve(jsonResponse(500, { message: 'boom' })),

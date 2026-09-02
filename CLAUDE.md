@@ -324,14 +324,34 @@ caben dos.
 - **El libro de transferencias escribe POR DELANTE.** La fila existe **antes** de llamar al
   proveedor, y después de toda la validación local: antes se llenaría de rechazos que nunca salieron
   del proceso, después un timeout no dejaría rastro. Tres desenlaces y son tres a propósito —
-  `submitted` con hash, `rejected` solo para el 400 de validación (**no pasó nada en la cadena**) y
-  **`unknown`** para timeout, red caída o 5xx. ⚠️ `unknown` es el estado honesto: **pudo minarse o**
-  **no**. No se inventa un `rejected`, que afirmaría algo falso, ni un `submitted` sin hash.
+  `submitted` con hash, **`rejected` cuando se sabe que NO PASÓ NADA EN LA CADENA** y **`unknown`**
+  para timeout, red caída o 5xx. ⚠️ `unknown` es el estado honesto: **pudo minarse o no**. No se
+  inventa un `rejected`, que afirmaría algo falso, ni un `submitted` sin hash.
+  ⚠️ **El criterio de `rejected` es ese, no un status.** Hasta el 2026-09-02 la regla escrita decía
+  «solo el 400 de validación», que era el único caso conocido colado como definición; hoy lo cumplen
+  dos respuestas del proveedor, ese 400 y su **403 con `errorCode: "sc.operation.failed"`**, que es
+  una reversión en simulación (`execution reverted`) y por tanto nada minado.
+- **Una precondición de negocio del proveedor NO es una caída suya.** Ese mismo 403 salía como
+  **503** «the integration is unavailable» —falso: el proveedor contestó, y bien— y ahora sale
+  **409**, igual que los demás conflictos de estado del módulo. La diferencia importa: un 503 le
+  dice al cliente «reintenta más tarde» y reintentaría para siempre, porque el tiempo no le pone
+  saldo a su wallet. ⚠️ **La reclasificación solo corre donde la culpa es del cliente**, o sea en la
+  transferencia (`blame: 'client-input'`): una reversión al ACTIVAR la pagaría el gas de la master,
+  o sea que sería nuestra, y sigue saliendo 503 para que el `ErrorReporter` —que solo ve 5xx— la
+  vea.
 - **El motivo del fallo es un CÓDIGO de lista cerrada, jamás el `message` del proveedor.** El del 401
   de Tatum interpola la clave de API y esa columna se publica por `GET /wallets/me/transfers`.
   Quien lo impide es el TIPO, no la disciplina: medido, pasar `error.message` no compila, y la misma
   clase con `reason: string` sí. ⚠️ Lo que el tipo NO cubre es `rehydrate`: ahí el valor viene de la
-  fila, así que el cierre es un `CHECK` en la migración.
+  fila y **hoy no lo cierra nadie**. La migración declina poner un `CHECK` sobre `reason_code` a
+  propósito —medido: el único `CHECK` del esquema es `ck_wallets_address_not_master`— y cerrarlo
+  exige una migración nueva. Está en `docs/backlog.md` #21.
+  ⚠️ **Del cuerpo de un error del proveedor se lee `errorCode` y NADA MÁS**, y quien lo garantiza es
+  otra vez el tipo: `isChainRevert` (`tatum-http.client.ts`) devuelve un `boolean`, así que ninguna
+  cadena suya puede alcanzar un error, una fila ni un log. `message` y `cause` no se leen ni para
+  clasificar. Medido rompiéndolo —adjuntando su `message` al error— contra un 403 que trae dentro el
+  texto del 401: `tatum-secret-surface.spec.ts` se pone rojo en tres superficies, la línea real de
+  pino incluida.
 - **La reconciliación es perezosa y no hay planificador.** Vive dentro de activar y de transferir,
   con `GET …/activated/…` — que es una llamada que hay que hacer igualmente: la precondición y la
   reconciliación son el mismo dato. El estado es **monótono**, así que una vez cacheado `active` el

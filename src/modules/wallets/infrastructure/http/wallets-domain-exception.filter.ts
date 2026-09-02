@@ -33,6 +33,7 @@ import {
   WalletOwnerGoneError,
   WalletOwnerMismatchError,
   WalletProviderRejectedError,
+  WalletProviderRevertedError,
   WalletProviderUnavailableError,
   WalletProviderUnreachableError,
 } from '../../domain/errors/wallet.errors';
@@ -76,9 +77,9 @@ const PROVIDER_UNAVAILABLE = 'The custodial provider integration is unavailable'
  * Además, `AllExceptionsFilter` copia a `details` las claves conocidas del cuerpo de una
  * `HttpException`: con un objeto, cualquier campo que alguien añadiera ahí saldría publicado.
  *
- * ⚠️ **El orden importa: gana el PRIMER `instanceof` que coincide.** Las tres clases de proveedor
+ * ⚠️ **El orden importa: gana el PRIMER `instanceof` que coincide.** Las cuatro clases de proveedor
  * comparten el padre abstracto `WalletProviderError`, que NO se mapea: mapearlo se comería a las
- * tres si alguien lo pusiera por delante.
+ * cuatro si alguien lo pusiera por delante.
  *
  * ⚠️ **Los cuatro `Invalid*` de identidad, índice y hash salen como 500, no como 400.** No son
  * alcanzables desde ninguna entrada del cliente: los cinco endpoints son «lo mío» y nadie pasa un
@@ -98,7 +99,7 @@ const PROVIDER_UNAVAILABLE = 'The custodial provider integration is unavailable'
  * producción: lo construye `new BadRequestException(exception.message)` en `DomainExceptionFilter`
  * y ese cuerpo ya es una `HttpException`, así que la rama saneada de `AllExceptionsFilter` —la que
  * solo pisa los `Error` no-HTTP— no lo toca. Por eso ningún error del proveedor cae en el
- * fallback: los tres se mapean explícitamente y ninguno de los tres mensajes interpola nada que
+ * fallback: los cuatro se mapean explícitamente y ninguno de los cuatro mensajes interpola nada que
  * venga de fuera.
  *
  * **Los seis que caen en el fallback 400 a propósito**, porque son entrada del cliente que el
@@ -173,6 +174,23 @@ export class WalletsDomainExceptionFilter extends DomainExceptionFilter<WalletDo
      * proveedor, este es el punto exacto por el que el secreto sale al cliente.
      */
     [WalletProviderRejectedError, (error) => new BadRequestException(error.message)],
+    /**
+     * **409 y no 503**, que es donde caía antes de 2026-09-02. El proveedor contestó y contestó
+     * bien: lo que no se puede es ejecutar la operación con el estado actual de la wallet. Un 503
+     * afirma que la integración está caída y le dice al cliente «reintenta más tarde» — y
+     * reintentaría para siempre, porque el tiempo no cambia ese estado. El 409 es el mismo status
+     * con el que este contexto publica los demás conflictos de estado (`WalletNotActivatedError`,
+     * `WalletActivationInProgressError`, `WalletAlreadyActivatedError`, `AdminUsesMasterAddressError`)
+     * y está en `VERIFIED_ERROR_STATUSES`, así que el guardián del contrato ya lo admite sin
+     * ampliar ese conjunto.
+     *
+     * ⚠️ `error.message` se publica, y vale palabra por palabra lo escrito para el 400 de arriba:
+     * solo es seguro porque el mensaje de la clase es FIJO —`'The blockchain reverted the transfer;
+     * nothing was mined'`— y no interpola nada del proveedor. Del cuerpo de su error este módulo
+     * lee `errorCode` y nada más, y ni siquiera ese valor llega hasta aquí: `isChainRevert`
+     * (`tatum-http.client.ts`) devuelve un booleano.
+     */
+    [WalletProviderRevertedError, (error) => new ConflictException(error.message)],
     /**
      * ⚠️ 502 y 503 sin `cause` y con mensaje FIJO, y las dos cosas por lo mismo: la causa real es
      * un error del TRANSPORTE, y `pino-std-serializers` concatena mensajes y stacks de las causas.

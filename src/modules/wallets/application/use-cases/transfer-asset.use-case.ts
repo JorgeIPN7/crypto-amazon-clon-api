@@ -14,6 +14,7 @@ import {
   WalletOwnerGoneError,
   WalletProviderError,
   WalletProviderRejectedError,
+  WalletProviderRevertedError,
 } from '../../domain/errors/wallet.errors';
 import { WalletRepository } from '../../domain/ports/wallet.repository';
 import { WalletTransferRepository } from '../../domain/ports/wallet-transfer.repository';
@@ -57,8 +58,10 @@ export type TransferAssetInput = {
  * 'save:submitted']`— y no dos aserciones sueltas. Medido borrando ese `save` —que es dejar el
  * libro con escritura POSTERIOR, la alternativa que §3.2 descarta— y corriendo la suite del módulo:
  * caen **seis**. Son el del diario, el del hash devuelto, los dos del reintento,
- * el del `Error` sin traducir y la propiedad de la primera fila; los otros doce siguen verdes,
- * porque un rechazo local no llega a escribir en ninguno de los dos órdenes.
+ * el del `Error` sin traducir y la propiedad de la primera fila; los otros trece siguen verdes,
+ * porque un rechazo local no llega a escribir en ninguno de los dos órdenes. Vuelto a medir el
+ * 2026-09-02 con el caso de la reversión ya dentro: siguen siendo los mismos seis —el nuevo entra
+ * en el lado verde, porque mira la ÚLTIMA escritura y esa la hace igualmente `recordOutcome()`—.
  *
  * ⚠️ **Un error que NO venga traducido del adaptador no se anota, se propaga.** El `reasonCode` del
  * libro reutiliza `ProviderFailureReason`, una lista cerrada donde no hay —ni debe haber— un código
@@ -67,13 +70,18 @@ export type TransferAssetInput = {
  * como `unknown` (spec §3.2).
  *
  * ⚠️ **La familia se captura por el PADRE abstracto, `WalletProviderError`, y no enumerando sus
- * tres hijos.** Con la enumeración, el hijo número cuatro caería por la rama del `else` y su fallo
- * se publicaría como un defecto nuestro — en verde y sin que nada lo dijera. Que leer `error.reason`
- * del padre baste está medido: `grep -n "readonly reason" domain/errors/wallet.errors.ts` devuelve
- * UNA línea, la 233, dentro de `WalletProviderError`. Lo del cuarto hijo, en cambio, es un
- * razonamiento y no una medición — hoy los hijos son tres y **ninguna prueba cubre ese futuro**.
- * El único que se nombra aparte es `WalletProviderRejectedError`, porque es el único desenlace que
- * afirma que **no pasó nada en la cadena**.
+ * hijos.** Con la enumeración, un hijo nuevo caería por la rama del `else` y su fallo se publicaría
+ * como un defecto nuestro — en verde y sin que nada lo dijera. Que leer `error.reason` del padre
+ * baste sigue medido: `grep -c "readonly reason" domain/errors/wallet.errors.ts` devuelve **1**,
+ * dentro de `WalletProviderError`.
+ *
+ * ⚠️ **El cuarto hijo ya llegó (`WalletProviderRevertedError`, 2026-09-02), y demostró que el padre
+ * salva la mitad del problema, no el problema entero.** El `error.reason` sí lo heredó sin tocar
+ * nada; lo que NO se hereda es el desenlace, porque una clase nueva no puede saber si su fallo tocó
+ * la cadena. Con el `if` anterior —que nombraba solo a `WalletProviderRejectedError`— esa reversión
+ * caía por el `else` y la fila decía `unknown`: «pudo minarse o no» sobre algo que revirtió en
+ * simulación y no se minó. Se enumeran, pues, las DOS clases que afirman **«no pasó nada en la
+ * cadena»**, y esa enumeración necesita un caso por rama: los tiene.
  *
  * ⚠️ **Lo que este caso de uso NO hace: reintentar la LLAMADA.** Un reintento ahí es una segunda
  * transacción, o sea dinero movido dos veces; la política vive en el adaptador y el JSDoc de
@@ -140,9 +148,14 @@ export class TransferAssetUseCase {
     try {
       txId = await this.gateway.send({ from: wallet.address, recipient, asset });
     } catch (error) {
-      if (error instanceof WalletProviderRejectedError) {
-        // El 400 de validación del cuerpo es el ÚNICO rechazo. Un 401 o un 403 no rechazaron
-        // nada: la petición ni se procesó como transferencia, así que van a `unknown`.
+      if (
+        error instanceof WalletProviderRejectedError ||
+        error instanceof WalletProviderRevertedError
+      ) {
+        // Las DOS formas de saber que **no pasó nada en la cadena**: el 400 de validación del
+        // cuerpo —nadie llegó a ejecutar nada— y el 403 con `sc.operation.failed`, que es una
+        // reversión en simulación. Un 401, un 403 de permisos o un timeout no permiten afirmar
+        // eso, así que van a `unknown`.
         transfer.markRejected(error.reason, new Date(), input.ownerId);
       } else if (error instanceof WalletProviderError) {
         transfer.markUnknown(error.reason, new Date(), input.ownerId);

@@ -43,12 +43,16 @@ import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
  * proveedor.** El motivo está medido y escrito en `wallet-transfer.entity.ts`: el mensaje del 401
  * de Tatum interpola la clave de API, y esta columna se publica por HTTP. El nombre de la columna
  * lo dice y el `varchar(40)` lo acota — el código más largo de la lista es
- * `'malformed-response'`, 18 caracteres, medido sobre `PROVIDER_FAILURE_REASONS`.
+ * `'malformed-response'`, 18 caracteres, medido sobre `PROVIDER_FAILURE_REASONS` (diez elementos
+ * desde el 2026-09-02; el nuevo, `'chain-reverted'`, mide 14 y no mueve esa cota).
  *
  * ⚠️ **El tipo NO cierra esta columna al releer.** `WalletTransfer.rehydrate` acepta cualquier
  * cadena que el mapper le pase con un `as`, cosa que su propio JSDoc mide y nombra. Quien puede
- * cerrarlo es el esquema, con un `CHECK ("reason_code" IS NULL OR "reason_code" IN (…los nueve…))`
- * en la migración de esta tabla.
+ * cerrarlo es el esquema, con un
+ * `CHECK ("reason_code" IS NULL OR "reason_code" IN (…los diez de la lista…))` en la migración de
+ * esta tabla. ⚠️ Eran nueve hasta el 2026-09-02: `chain-reverted` los hizo diez y la columna siguió
+ * aceptando cualquier cosa, que es la deuda intacta. El `varchar(40)` sigue holgado — el código más
+ * largo sigue siendo `'malformed-response'`, 18 caracteres, y el nuevo mide 14.
  *
  * **Por qué ese `CHECK` no se declara aquí, dicho como lo que es: una decisión, no un
  * impedimento.** Nada impide que este archivo importe `PROVIDER_FAILURE_REASONS` —la regla de

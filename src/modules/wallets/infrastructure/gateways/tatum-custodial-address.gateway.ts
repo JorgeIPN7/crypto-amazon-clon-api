@@ -136,7 +136,7 @@ export class TatumCustodialAddressGateway implements CustodialAddressGateway {
         to: index.value,
       },
       retryable: true,
-      badRequestBlame: 'our-configuration',
+      blame: 'our-configuration',
     });
     const address = readAddress(readSingleAddress(body));
     if (address.equals(this.master)) {
@@ -192,7 +192,7 @@ export class TatumCustodialAddressGateway implements CustodialAddressGateway {
             // no se guarda en ningún sitio.
             { ...range, fromPrivateKey: this.masterPrivateKey.value },
       retryable: false,
-      badRequestBlame: 'our-configuration',
+      blame: 'our-configuration',
     });
     return readTxId(body);
   }
@@ -203,7 +203,7 @@ export class TatumCustodialAddressGateway implements CustodialAddressGateway {
       method: 'GET',
       path: `/v3/gas-pump/activated/${TATUM_CHAIN}/${this.master.value}/${index.value}`,
       retryable: true,
-      badRequestBlame: 'our-configuration',
+      blame: 'our-configuration',
     });
     return readActivated(body);
   }
@@ -231,7 +231,7 @@ export class TatumCustodialAddressGateway implements CustodialAddressGateway {
         fromPrivateKey: this.masterPrivateKey.value,
       },
       retryable: false,
-      badRequestBlame: 'client-input',
+      blame: 'client-input',
     });
     return readTxId(body);
   }

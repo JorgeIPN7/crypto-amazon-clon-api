@@ -29,6 +29,7 @@ import {
   WalletOwnerMismatchError,
   WalletProviderError,
   WalletProviderRejectedError,
+  WalletProviderRevertedError,
   WalletProviderUnavailableError,
   WalletProviderUnreachableError,
 } from '../../../domain/errors/wallet.errors';
@@ -280,6 +281,19 @@ describe('wallet.errors', () => {
       expect(error.providerStatus).toBe(400);
     });
 
+    // El mensaje afirma lo que se sabe —revirtió y no se minó nada— y NO «no hay saldo»: ese
+    // `errorCode` cubre cualquier reversión del contrato y el proveedor no la desglosa.
+    it('debería construir WalletProviderRevertedError con un mensaje que no menciona el saldo', () => {
+      // Arrange + Act
+      const error = new WalletProviderRevertedError('chain-reverted', 403);
+
+      // Assert
+      expect(error.message).toBe('The blockchain reverted the transfer');
+      expect(error.reason).toBe('chain-reverted');
+      expect(error.providerStatus).toBe(403);
+      expect(error.message).not.toContain('balance');
+    });
+
     it('debería construir WalletProviderUnreachableError admitiendo un status nulo', () => {
       // Arrange + Act
       const error = new WalletProviderUnreachableError('timeout', null);
@@ -303,13 +317,14 @@ describe('wallet.errors', () => {
     });
 
     // El padre existe por dos motivos: declarar `reason` y `providerStatus` una vez en lugar de
-    // tres, y que el caso de uso de la transferencia capture la familia para leer `error.reason`.
-    // ⚠️ El filtro NO: gana con el primer `instanceof`, así que agruparlas ahí colapsaría 400, 502
-    // y 503 en un solo status.
-    it('debería agrupar los tres errores del proveedor bajo el padre WalletProviderError, y solo a ellos', () => {
+    // cuatro, y que el caso de uso de la transferencia capture la familia para leer `error.reason`.
+    // ⚠️ El filtro NO: gana con el primer `instanceof`, así que agruparlas ahí colapsaría 400, 409,
+    // 502 y 503 en un solo status.
+    it('debería agrupar los cuatro errores del proveedor bajo el padre WalletProviderError, y solo a ellos', () => {
       // Arrange
       const fromTheProvider = [
         new WalletProviderRejectedError('body-rejected', 400),
+        new WalletProviderRevertedError('chain-reverted', 403),
         new WalletProviderUnreachableError('timeout', null),
         new WalletProviderUnavailableError('unauthorized', 401),
       ];
@@ -327,13 +342,16 @@ describe('wallet.errors', () => {
     // La lista es ÚNICA: el `reasonCode` del libro de transferencias reutiliza este mismo tipo, y
     // añadir un motivo aquí es lo que lo hace guardable allí. Un segundo vocabulario paralelo
     // dejaría dos verdades sobre por qué falló la misma llamada.
-    it('debería publicar los nueve motivos de fallo del proveedor como lista única', () => {
+    it('debería publicar los diez motivos de fallo del proveedor como lista única', () => {
       // Arrange + Act + Assert
       expect(PROVIDER_FAILURE_REASONS).toEqual([
         'body-rejected',
         'misconfigured',
         'unauthorized',
         'forbidden',
+        // El décimo, añadido el 2026-09-02: el 403 con `errorCode: "sc.operation.failed"`. Va
+        // pegado a `forbidden` porque los dos son ese mismo status leído con y sin el cuerpo.
+        'chain-reverted',
         'undocumented-4xx',
         'upstream-error',
         'unreachable',
@@ -359,7 +377,7 @@ describe('wallet.errors', () => {
 
   describe('wallet.errors (property-based)', () => {
     // Compartir abuelo (`DomainError`) NO ensancha el `instanceof`: lo que se comprueba aquí es
-    // que ninguna de las 24 clases se saltó el marcador, porque una que heredara directamente de
+    // que ninguna de las 25 clases se saltó el marcador, porque una que heredara directamente de
     // `DomainError` compilaría igual y el filtro de `wallets` dejaría de verla — un 500 mudo.
     it('debería heredar del marcador y publicar su nombre concreto, sea cual sea el error', () => {
       fc.assert(
@@ -387,6 +405,7 @@ describe('wallet.errors', () => {
           // Act
           const errors = [
             new WalletProviderRejectedError(reason, status),
+            new WalletProviderRevertedError(reason, status),
             new WalletProviderUnreachableError(reason, status),
             new WalletProviderUnavailableError(reason, status),
           ];
@@ -467,7 +486,7 @@ const catalogueClasses: readonly CatalogueClass[] = exportedValues.filter(
 );
 
 /**
- * Las 24 clases concretas del archivo, con el nombre que cada una debe publicar en `name`.
+ * Las 25 clases concretas del archivo, con el nombre que cada una debe publicar en `name`.
  * ⚠️ Añadir una clase a `wallet.errors.ts` obliga a añadirla aquí: la propiedad P1 solo
  * comprueba lo que esta lista contiene. Lo que P1 NO puede ver —una clase que se saltara el
  * marcador y que tampoco llegara a esta lista— lo cubre P3, que descubre las clases del módulo.
@@ -495,6 +514,7 @@ const errorFactories: readonly (readonly [string, () => WalletDomainError])[] = 
   ['WalletAddressIsMasterError', () => new WalletAddressIsMasterError('0xmaster')],
   ['WalletAssignmentLostError', () => new WalletAssignmentLostError('owner-1')],
   ['WalletProviderRejectedError', () => new WalletProviderRejectedError('body-rejected', 400)],
+  ['WalletProviderRevertedError', () => new WalletProviderRevertedError('chain-reverted', 403)],
   ['WalletProviderUnreachableError', () => new WalletProviderUnreachableError('timeout', null)],
   ['WalletProviderUnavailableError', () => new WalletProviderUnavailableError('unauthorized', 401)],
 ];

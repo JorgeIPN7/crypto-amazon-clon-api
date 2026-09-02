@@ -144,8 +144,10 @@ export class WalletTransfer extends Entity<TransferId> {
    * cerrada existe para mantener fuera de esa respuesta.
    *
    * **Quien tiene que cerrarlo es el esquema, y hoy sigue sin haber nadie**: haría falta un
-   * `CHECK ("reason_code" IS NULL OR "reason_code" IN (…los nueve…))` sobre `wallet_transfers`.
-   * Sin eso escrito aquí, el control no está en el calendario de nadie.
+   * `CHECK ("reason_code" IS NULL OR "reason_code" IN (…los diez de la lista…))` sobre
+   * `wallet_transfers`. Sin eso escrito aquí, el control no está en el calendario de nadie.
+   * ⚠️ Eran nueve hasta el 2026-09-02, cuando `chain-reverted` los hizo diez: la lista ya crece, que
+   * es exactamente el envejecimiento que la migración temía al no duplicarla en el esquema.
    *
    * ⚠️ **Lo que ya NO es cierto es que falte la tabla.** `wallet_transfers` la crea
    * `src/database/migrations/1787900000000-create-wallets.ts` —la misma que `wallets`— y lo que
@@ -201,9 +203,12 @@ export class WalletTransfer extends Entity<TransferId> {
   }
 
   /**
-   * Solo el 400 de validación del cuerpo, que significa que **no pasó nada en la cadena**. Un 401
-   * o un 403 del proveedor no son un rechazo del envío —la petición ni llegó a procesarse como
-   * transferencia— y van a `markUnknown`.
+   * **No pasó nada en la cadena**, que es el criterio entero — nunca «llegó tal status». Lo cumplen
+   * el 400 de validación del cuerpo, donde nadie llegó a ejecutar nada, y el 403 con
+   * `errorCode: "sc.operation.failed"`, que es una reversión en simulación. Un 401, o un 403 de
+   * permisos, no son un rechazo del envío —la petición ni llegó a procesarse como transferencia— y
+   * van a `markUnknown`. La versión anterior de esta frase decía «solo el 400 de validación», que
+   * era el único caso conocido cuando se escribió, no la regla.
    */
   markRejected(reason: ProviderFailureReason, now: Date, by: string | null): void {
     this.settle('rejected', null, reason, now, by);

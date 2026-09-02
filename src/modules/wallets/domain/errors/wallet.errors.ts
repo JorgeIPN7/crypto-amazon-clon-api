@@ -32,12 +32,20 @@ export abstract class WalletDomainError extends DomainError {}
  * ⚠️ **Es la única lista del módulo.** `WalletTransfer` guarda exactamente este mismo código en
  * sus estados `rejected` y `unknown` (spec §3.2) y la columna se llama `reason_code`: no hay un
  * `TransferFailureReason` aparte, porque es la misma información vista desde otro sitio.
+ *
+ * ⚠️ **`chain-reverted` es el primer motivo que sale de LEER el cuerpo del error del proveedor, y
+ * de ese cuerpo se lee `errorCode` y nada más.** Es un identificador corto y enumerable
+ * —`sc.operation.failed`, `subscription.invalid`, `validation.failed`— que no interpola nada;
+ * `message` y `cause` no se leen ni siquiera para clasificar. La medición de por qué esa distinción
+ * es la línea entre clasificar y filtrar un secreto vive en `tatum-http.client.ts`, que es el único
+ * archivo que toca ese cuerpo.
  */
 export const PROVIDER_FAILURE_REASONS = [
   'body-rejected', // 400 del proveedor en la TRANSFERENCIA (culpa del cliente)
   'misconfigured', // 400 del proveedor al derivar o activar (culpa nuestra)
   'unauthorized', // 401
-  'forbidden', // 403
+  'forbidden', // 403 SIN `errorCode: "sc.operation.failed"`: permisos de NUESTRA clave
+  'chain-reverted', // 403 CON ese `errorCode`: la cadena revirtió y no se minó nada
   'undocumented-4xx', // 404, 429, 402, 409… nada de esto está en su contrato
   'upstream-error', // 5xx
   'unreachable', // DNS / TCP / TLS
@@ -204,24 +212,32 @@ export class WalletAssignmentLostError extends WalletDomainError {
 }
 
 /**
- * Padre de los tres errores del proveedor. Existe por dos motivos, y el primero es de compilación:
- * es donde `reason` y `providerStatus` se declaran UNA vez en lugar de tres. El segundo es el caso
+ * Padre de los CUATRO errores del proveedor. Existe por dos motivos, y el primero es de compilación:
+ * es donde `reason` y `providerStatus` se declaran UNA vez en lugar de cuatro. El segundo es el caso
  * de uso de la transferencia, que captura la familia entera para leer `error.reason` y pasárselo a
- * `markRejected`/`markUnknown` (spec §5.3); sin el padre enumeraría las tres clases y se quedaría
- * desactualizado al añadir la cuarta, en verde y sin que nada lo dijera.
+ * `markRejected`/`markUnknown` (spec §5.3); sin el padre enumeraría las clases y se quedaría
+ * desactualizado al añadir una, en verde y sin que nada lo dijera.
+ *
+ * ⚠️ **Y ese futuro ya ocurrió, así que la advertencia deja de ser hipotética: la cuarta clase es
+ * `WalletProviderRevertedError` (2026-09-02).** Lo que el padre salvó fue la lectura de
+ * `error.reason`; lo que NO puede salvar es la elección de desenlace, porque una clase nueva no
+ * puede saber si su fallo tocó la cadena. Por eso el `catch` del caso de uso enumera hoy las DOS
+ * clases que significan «no pasó nada en la cadena» en vez de una — y por eso ese punto lleva su
+ * propio caso.
  *
  * ⚠️ **El filtro NO debe tratarlas como familia, y meterlo aquí sería el peor consejo posible.**
  * `DomainExceptionFilter.catch()` gana con el PRIMER `instanceof` que coincide y `DomainErrorMapping`
  * acepta clases abstractas, así que una fila `[WalletProviderError, …]` compilaría y colapsaría en
- * silencio los tres status que el contrato publica por separado: 400 para `Rejected`, 502 para
- * `Unreachable` y 503 para `Unavailable` (spec §3.5). El filtro las enumera de una en una.
+ * silencio los cuatro status que el contrato publica por separado: 400 para `Rejected`, 409 para
+ * `Reverted`, 502 para `Unreachable` y 503 para `Unavailable` (spec §3.5). El filtro las enumera de
+ * una en una.
  *
  * Aquí viven los dos únicos campos que un error del proveedor puede transportar: el código
  * NUESTRO y el status. `providerStatus` es nullable porque los casos normalizados del §6.2 —un
  * `activated` ausente, un array de derivación con cardinalidad distinta de uno, un timeout— no
  * tienen status que citar.
  *
- * ⚠️ Los mensajes de los tres hijos son **FIJOS** y no interpolan nada. Es lo que impide que la
+ * ⚠️ Los mensajes de los cuatro hijos son **FIJOS** y no interpolan nada. Es lo que impide que la
  * clave privada de la master, que viaja en el cuerpo de la transferencia, entre en un error:
  * `pino-std-serializers` recorre toda propiedad enumerable del error y la escribe. La propiedad
  * P2 lo fija, y de paso prohíbe escribir «is unreachable» en el 502 — ese literal contiene el
@@ -247,6 +263,38 @@ export class WalletProviderRejectedError extends WalletProviderError {
   }
 }
 
+/**
+ * La cadena revirtió la operación ⇒ **409**. Es el 403 del proveedor cuyo cuerpo trae
+ * `errorCode: "sc.operation.failed"`, y son dos afirmaciones distintas las que justifican los dos
+ * cambios respecto de `WalletProviderUnavailableError`, que es donde caía antes:
+ *
+ * - **No es una caída de la integración.** El proveedor contestó, y contestó bien; lo que no se
+ *   puede es ejecutar la operación con el estado actual de la wallet. Un 503 le dice al cliente
+ *   «reintenta más tarde» y reintentará para siempre, porque el tiempo no cambia ese estado. El 409
+ *   es el mismo status con el que este contexto publica los otros conflictos de estado
+ *   —activación en curso, ya activada, el admin—, y el cliente SÍ puede actuar.
+ * - **Se sabe que no se minó nada**, así que la fila del libro va a `rejected` y no a `unknown`.
+ *   El razonamiento, escrito entero para que se pueda discutir: el proveedor responde un ERROR sin
+ *   `txId`, y `execution reverted` es lo que devuelve un nodo cuando falla la simulación
+ *   (`eth_call` / `eth_estimateGas`), o sea antes de firmar y difundir nada.
+ *   ⚠️ **No comprobado en un explorador de bloques**: nadie ha verificado el nonce de la master tras
+ *   una reversión. Si algún día se viera que el proveedor SÍ difunde y la transacción revierte en
+ *   cadena —gastando gas y dejando hash—, el desenlace correcto volvería a ser `unknown`.
+ *
+ * ⚠️ **El nombre dice «la cadena revirtió», NUNCA «no hay saldo».** Ese `errorCode` cubre cualquier
+ * reversión del contrato y el proveedor no lo desglosa: afirmar que siempre es falta de fondos sería
+ * una afirmación que no se puede medir. Lo único cierto de todas ellas es que la operación revirtió.
+ * La única reversión observada de verdad —2026-09-02, contra Sepolia, transferencia de 0.001 ETH
+ * desde una gas pump address sin saldo— llegó con `cause: "Returned error: execution reverted:
+ * Address: insufficient balance"`, y ese texto **no se lee, no se guarda y no viaja**: de todo el
+ * cuerpo de un error solo se lee `errorCode` (ver `tatum-http.client.ts`).
+ */
+export class WalletProviderRevertedError extends WalletProviderError {
+  constructor(reason: ProviderFailureReason, providerStatus: number | null) {
+    super('The blockchain reverted the transfer', reason, providerStatus);
+  }
+}
+
 /** Proveedor caído o contrato roto ⇒ 502. */
 export class WalletProviderUnreachableError extends WalletProviderError {
   constructor(reason: ProviderFailureReason, providerStatus: number | null) {
@@ -259,9 +307,9 @@ export class WalletProviderUnreachableError extends WalletProviderError {
 }
 
 /**
- * Configuración NUESTRA rota (400 en derivar o activar, 401, 403, cualquier otro 4xx no
- * documentado) ⇒ 503. Son dos clases y no una porque el filtro mapea clase → excepción HTTP: una
- * sola no puede rendir 502 y 503 a la vez.
+ * Configuración NUESTRA rota (400 en derivar o activar, 401, el 403 que NO es una reversión de la
+ * cadena, cualquier otro 4xx no documentado) ⇒ 503. Son dos clases y no una porque el filtro mapea
+ * clase → excepción HTTP: una sola no puede rendir 502 y 503 a la vez.
  */
 export class WalletProviderUnavailableError extends WalletProviderError {
   constructor(reason: ProviderFailureReason, providerStatus: number | null) {

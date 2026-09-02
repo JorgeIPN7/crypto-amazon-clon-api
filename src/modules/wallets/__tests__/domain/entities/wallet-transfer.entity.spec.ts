@@ -143,8 +143,10 @@ describe('WalletTransfer', () => {
 
   describe('markRejected()', () => {
     it('debería pasar a rejected con el motivo recibido y sin txId', () => {
-      // Arrange: `rejected` es SOLO el 400 de validación del cuerpo —`'body-rejected'`—, es decir
-      // que no pasó nada en la cadena y no hay hash que guardar (§3.2).
+      // Arrange: `rejected` significa «no pasó nada en la cadena» —el 400 de validación del cuerpo,
+      // `'body-rejected'`, o el 403 de reversión, `'chain-reverted'`—, así que no hay hash que
+      // guardar (§3.2). El criterio nunca fue el status; hasta el 2026-09-02 el 400 era el único
+      // caso conocido y la frase de aquí lo decía como si fuera la regla.
       const transfer = buildStartedTransfer();
 
       // Act
@@ -423,7 +425,7 @@ describe('WalletTransfer', () => {
         // Assert — «tal cual» es la propiedad: ni se normaliza, ni se traduce, ni se sustituye por
         // texto del proveedor. Lo que impide que entre texto libre es el TIPO —`markUnknown` pide
         // un `ProviderFailureReason`, así que `transfer.markUnknown(err.message, …)` no compila—;
-        // lo que esta propiedad fija es que los nueve códigos legales llegan intactos a la fila.
+        // lo que esta propiedad fija es que los diez códigos legales llegan intactos a la fila.
         expect(settlementOf(transfer)).toEqual({
           status: 'unknown',
           txId: null,

@@ -9,6 +9,20 @@ import {
 const API_URL = 'http://127.0.0.1:9';
 const API_KEY = 'clave-de-prueba';
 
+/**
+ * El cuerpo LITERAL con el que Sepolia contestó el 2026-09-02 a una transferencia desde una gas
+ * pump address sin saldo. Se copia entero, con su `message` y su `cause`, en vez de reducirlo al
+ * `errorCode`: son justo los dos campos que este módulo NO lee, y tenerlos aquí es lo que hace que
+ * las aserciones de «no viaja nada del cuerpo» midan algo.
+ */
+const CHAIN_REVERT_BODY = {
+  statusCode: 403,
+  errorCode: 'sc.operation.failed',
+  message:
+    'Unable to transfer assets. Please check, that your address contains all the tokens you want to transfer.',
+  cause: 'Returned error: execution reverted: Address: insufficient balance',
+};
+
 describe('TatumHttpClient', () => {
   describe('request()', () => {
     it('debería devolver el cuerpo JSON ya parseado de una respuesta 200', async () => {
@@ -93,6 +107,102 @@ describe('TatumHttpClient', () => {
         name: 'WalletProviderUnavailableError',
         reason: 'forbidden',
         providerStatus: 403,
+      });
+    });
+
+    // El cuerpo es el que devolvió Sepolia de verdad el 2026-09-02 al transferir sin saldo, copiado
+    // literal: un cuerpo inventado probaría el `errorCode` que nos apetece, no el que manda.
+    it('debería traducir a WalletProviderRevertedError el 403 de la transferencia que dice que la cadena revirtió', async () => {
+      // Arrange
+      const fetcher = fakeFetch(() => Promise.resolve(jsonResponse(403, CHAIN_REVERT_BODY)));
+      const client = new TatumHttpClient(walletsConfig(), fetcher.impl);
+
+      // Act
+      const error = await captureRejection(client.request(transferRequest()));
+
+      // Assert
+      expect(error).toMatchObject({
+        name: 'WalletProviderRevertedError',
+        reason: 'chain-reverted',
+        providerStatus: 403,
+      });
+      // El mensaje es FIJO: del cuerpo del proveedor no viaja ni una palabra, y del cuerpo se lee
+      // `errorCode` y nada más. `message` y `cause` ni se leen: el `cause` de este mismo cuerpo
+      // lleva `execution reverted: Address: insufficient balance`.
+      expect((error as Error).message).toBe('The blockchain reverted the transfer');
+      expect(JSON.stringify(error)).not.toContain('insufficient balance');
+      expect(JSON.stringify(error)).not.toContain('sc.operation.failed');
+    });
+
+    // ⚠️ Los tres casos de abajo son la mitad que impide que la clasificación se coma el 503. Un
+    // fallo de permisos de NUESTRA clave sigue siendo cosa nuestra y tiene que llegar al
+    // `ErrorReporter`, que solo ve 5xx.
+    it.each([
+      ['otro errorCode', { statusCode: 403, errorCode: 'subscription.invalid', message: 'x' }],
+      // La forma que su `openapi.json` publica para el 403: `message` y `statusCode`, sin
+      // `errorCode` (medido en `components.responses.Error403`, cuyo `required` es
+      // `["statusCode","message"]`).
+      ['ningún errorCode', { statusCode: 403, message: 'Forbidden' }],
+      ['un errorCode que no es una cadena', { statusCode: 403, errorCode: 7 }],
+    ])('debería dejar en 503 el 403 de la transferencia con %s', async (_caso, body) => {
+      // Arrange
+      const fetcher = fakeFetch(() => Promise.resolve(jsonResponse(403, body)));
+      const client = new TatumHttpClient(walletsConfig(), fetcher.impl);
+
+      // Act + Assert
+      await expect(client.request(transferRequest())).rejects.toMatchObject({
+        name: 'WalletProviderUnavailableError',
+        reason: 'forbidden',
+        providerStatus: 403,
+      });
+    });
+
+    it('debería dejar en 503 el 403 cuyo cuerpo ni siquiera es JSON', async () => {
+      // Arrange: un cuerpo ilegible no es una reversión. Y leerlo NO puede lanzar: convertiría un
+      // fallo del proveedor en un fallo nuestro.
+      const fetcher = fakeFetch(() =>
+        Promise.resolve(new Response('<html>forbidden</html>', { status: 403 })),
+      );
+      const client = new TatumHttpClient(walletsConfig(), fetcher.impl);
+
+      // Act + Assert
+      await expect(client.request(transferRequest())).rejects.toMatchObject({
+        name: 'WalletProviderUnavailableError',
+        reason: 'forbidden',
+        providerStatus: 403,
+      });
+    });
+
+    // Derivar y activar construimos su cuerpo enteros y el gas lo paga NUESTRA master: una
+    // reversión ahí es nuestra, no del cliente. Publicarla como 409 le culparía de nuestro gas y la
+    // escondería del `ErrorReporter`. Este caso es el que fija que la culpa, y no solo el status,
+    // gobierna la clasificación.
+    it('debería dejar en 503 el MISMO 403 cuando la operación es de nuestra configuración', async () => {
+      // Arrange
+      const fetcher = fakeFetch(() => Promise.resolve(jsonResponse(403, CHAIN_REVERT_BODY)));
+      const client = new TatumHttpClient(walletsConfig(), fetcher.impl);
+
+      // Act + Assert
+      await expect(client.request(derivationRequest())).rejects.toMatchObject({
+        name: 'WalletProviderUnavailableError',
+        reason: 'forbidden',
+        providerStatus: 403,
+      });
+    });
+
+    // El cuerpo se lee SOLO en el 403: en el 400 el `errorCode` del proveedor no distingue las dos
+    // culpas —`validation.failed` tanto para un destinatario inválido como para una master sin
+    // fondos— así que leerlo ahí ampliaría la superficie del secreto sin decidir nada.
+    it('debería no leer el cuerpo del 400, que sigue saliendo como body-rejected', async () => {
+      // Arrange
+      const fetcher = fakeFetch(() => Promise.resolve(jsonResponse(400, CHAIN_REVERT_BODY)));
+      const client = new TatumHttpClient(walletsConfig(), fetcher.impl);
+
+      // Act + Assert
+      await expect(client.request(transferRequest())).rejects.toMatchObject({
+        name: 'WalletProviderRejectedError',
+        reason: 'body-rejected',
+        providerStatus: 400,
       });
     });
 
@@ -230,7 +340,7 @@ const derivationRequest = (): TatumRequest => ({
   path: '/v3/gas-pump',
   body: { chain: 'ETH' },
   retryable: true,
-  badRequestBlame: 'our-configuration',
+  blame: 'our-configuration',
 });
 
 /** No reintentable —mueve dinero— y con el 400 imputable al cliente: la transferencia. */
@@ -239,7 +349,7 @@ const transferRequest = (): TatumRequest => ({
   path: '/v3/blockchain/sc/custodial/transfer',
   body: { chain: 'ETH' },
   retryable: false,
-  badRequestBlame: 'client-input',
+  blame: 'client-input',
 });
 
 const jsonResponse = (status: number, body: unknown): Response =>
@@ -247,6 +357,19 @@ const jsonResponse = (status: number, body: unknown): Response =>
     status,
     headers: { 'content-type': 'application/json' },
   });
+
+/**
+ * Devuelve el error en vez de solo afirmar sobre él: los casos de la reversión tienen que mirar el
+ * `message` y el volcado completo, y `rejects.toMatchObject` no da acceso al objeto.
+ */
+const captureRejection = async (promise: Promise<unknown>): Promise<unknown> => {
+  try {
+    await promise;
+  } catch (error) {
+    return error;
+  }
+  throw new Error('se esperaba un fallo del proveedor y la promesa se resolvió');
+};
 
 /**
  * `fetch` escrito a mano, inyectado por constructor. NO `jest.mock('node:…')`: el doble es un
