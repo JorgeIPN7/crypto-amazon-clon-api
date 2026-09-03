@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 
 import { createTestApp } from '@test/helpers/create-test-app';
 import { resetThrottler } from '@test/helpers/reset-throttler';
+import { TatumStubServer } from '@test/helpers/tatum-stub-server';
 
 import type { AppConfig } from '@config/app.config';
 
@@ -68,6 +69,7 @@ describe('contrato OpenAPI en ejecución', () => {
   let document: OpenAPIObject;
   let appConfig: AppConfig;
   let context: Context;
+  let stub: TatumStubServer;
   const ajv = new Ajv({ strict: false, allErrors: true });
 
   /**
@@ -92,9 +94,16 @@ describe('contrato OpenAPI en ejecución', () => {
   };
 
   beforeAll(async () => {
+    // El stub del proveedor custodial arranca ANTES que la app. Los tres escenarios de `wallets`
+    // que salen a la red lo necesitan escuchando, y sin él saldrían a `TATUM_API_URL`, que en esta
+    // suite apunta a loopback por `test/setup-env.ts` — o sea que la petición moriría con
+    // ECONNREFUSED y el escenario hablaría del stub y no del contrato.
+    stub = await TatumStubServer.start();
     ({ app, prefix, appConfig } = await createTestApp());
     document = buildOpenApiDocument(app, appConfig);
     const dataSource = app.get(DataSource);
+    await dataSource.query('TRUNCATE TABLE wallet_transfers');
+    await dataSource.query('TRUNCATE TABLE wallets');
     await dataSource.query('TRUNCATE TABLE auth_credentials');
     await dataSource.query('TRUNCATE TABLE users CASCADE');
     await dataSource.query('TRUNCATE TABLE orders CASCADE');
@@ -146,6 +155,17 @@ describe('contrato OpenAPI en ejecución', () => {
 
   afterAll(async () => {
     await app?.close();
+    // La aserción va ANTES de parar el stub: una ruta golpeada sin respuesta programada significa
+    // que el guion mandó una llamada que nadie previó, y el 418 con el que el stub contestó no
+    // representa nada del proveedor. Sin esto, un escenario podría estar validando contra el
+    // esquema una respuesta de error que se ganó el propio doble.
+    // ⚠️ Se copia la lista y se PARA el stub antes de afirmar. Con la aserción delante, un fallo
+    // deja el `stop()` sin ejecutar y el puerto fijo ocupado: la siguiente suite E2E que arranque
+    // el stub —misma corrida, `maxWorkers: 1`— muere con EADDRINUSE y el rojo habla del puerto en
+    // vez del contrato. Es el patrón que `wallets.e2e-spec.ts` ya usa en su `afterEach`.
+    const missed = [...(stub?.unstubbed ?? [])];
+    await stub?.stop();
+    expect(missed).toEqual([]);
   });
 
   const get = (context: Context, path: string, token?: string) => {
@@ -272,6 +292,90 @@ describe('contrato OpenAPI en ejecución', () => {
           .post(`${context.prefix}/orders`)
           .set('Authorization', `Bearer ${context.userToken}`)
           .send({ concept: 'Pedido de prueba', amountCents: -1 }),
+    },
+    // Los cinco de `wallets`, EN ESTE ORDEN. `it.each` conserva el orden del array y Jest los
+    // corre en serie, así que cada uno deja el estado que el siguiente necesita: la wallet existe
+    // antes de leerla, está activándose antes de transferir, y el libro tiene una fila antes de
+    // listarlo. El stub se programa DENTRO de cada `run`, que es lo único que mantiene el
+    // escenario autocontenido — un stub «por defecto» en el `beforeAll` volvería inútil el
+    // registro `unstubbed` que el `afterAll` comprueba.
+    //
+    // Que los cinco VALIDAN de verdad la respuesta está medido rompiendo los dos DTO: quitando
+    // `dto.status` de `WalletResponseDto.fromDomain` caen los tres que devuelven una wallet, con
+    // `must have required property 'status'` y `schemaPath
+    // "#/components/schemas/WalletResponseDto/required"`; quitando `dto.txId` de
+    // `WalletTransferResponseDto.fromDomain` caen los dos del libro, con el mensaje equivalente.
+    {
+      operation: 'POST /wallets',
+      status: 200,
+      describe: 'el alta de la wallet custodiada',
+      run: (context) => {
+        stub.stub('POST', '/v3/gas-pump', {
+          status: 200,
+          body: [`0xdeadbeef${'0'.repeat(31)}1`],
+        });
+        return request(context.app.getHttpServer())
+          .post(`${context.prefix}/wallets`)
+          .set('Authorization', `Bearer ${context.userToken}`)
+          .send();
+      },
+    },
+    {
+      operation: 'GET /wallets/me',
+      status: 200,
+      describe: 'la consulta de la wallet propia',
+      run: (context) => get(context, '/wallets/me', context.userToken),
+    },
+    {
+      operation: 'POST /wallets/me/activation',
+      status: 202,
+      describe: 'la activación de la wallet',
+      run: (context) => {
+        // El comodín por prefijo es obligatorio: la ruta lleva el índice que asignó la secuencia
+        // de PostgreSQL, y el guion no puede saberlo de antemano porque la secuencia no se
+        // reinicia entre suites.
+        stub.stub('GET', '/v3/gas-pump/activated/*', {
+          status: 200,
+          body: { activated: false },
+        });
+        stub.stub('POST', '/v3/gas-pump/activate', {
+          status: 200,
+          body: { txId: 'ac'.repeat(32) },
+        });
+        return request(context.app.getHttpServer())
+          .post(`${context.prefix}/wallets/me/activation`)
+          .set('Authorization', `Bearer ${context.userToken}`)
+          .send();
+      },
+    },
+    {
+      operation: 'POST /wallets/me/transfers',
+      status: 200,
+      describe: 'una transferencia enviada',
+      run: (context) => {
+        // `activated: true` reconcilia la wallet de `activating` a `active` en la misma llamada
+        // que sirve de precondición: sin ella la transferencia daría 409 y este escenario
+        // validaría contra el esquema equivocado.
+        stub.stub('GET', '/v3/gas-pump/activated/*', { status: 200, body: { activated: true } });
+        stub.stub('POST', '/v3/blockchain/sc/custodial/transfer', {
+          status: 200,
+          body: { txId: '7a'.repeat(32) },
+        });
+        return request(context.app.getHttpServer())
+          .post(`${context.prefix}/wallets/me/transfers`)
+          .set('Authorization', `Bearer ${context.userToken}`)
+          .send({
+            recipient: '0xabcdef0123456789abcdef0123456789abcdef01',
+            kind: 'native',
+            amount: '1000000000000000',
+          });
+      },
+    },
+    {
+      operation: 'GET /wallets/me/transfers',
+      status: 200,
+      describe: 'el listado paginado del libro de transferencias',
+      run: (context) => get(context, '/wallets/me/transfers?page=1&limit=20', context.userToken),
     },
   ];
 

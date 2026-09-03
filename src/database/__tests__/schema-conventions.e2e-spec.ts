@@ -19,8 +19,32 @@ type ColumnRow = { table_name: string; column_name: string };
  *
  * Se arregló reescribiendo migraciones, algo que solo fue barato porque no había datos ni
  * despliegue. Con datos, cada columna habría necesitado su propia pareja expand/contract. Esta
- * suite es lo que impide pagar eso: `SnakeNamingStrategy` hace que la convención se cumpla sola,
- * y estos casos comprueban que sigue puesta.
+ * suite es lo que impide pagar eso otra vez.
+ *
+ * ## ⚠️ Lo que esta suite NO caza, y hasta el 2026-08-31 esta misma cabecera afirmaba que sí
+ *
+ * Decía «`SnakeNamingStrategy` hace que la convención se cumpla sola, y estos casos comprueban que
+ * sigue puesta». La segunda mitad es falsa, y falsa **en verde**, que es la peor forma: quitando
+ * `namingStrategy: new SnakeNamingStrategy()` de `buildTypeOrmOptions` los CUATRO casos de aquí
+ * siguen pasando (medido el 2026-08-31), porque ninguna columna que YA existe cambia de nombre al
+ * quitarla — el esquema lo escriben las migraciones, no la estrategia. Quien la caza es el caso
+ * «debería registrar la estrategia de nombres snake_case» de `typeorm-options.spec.ts`, que con esa
+ * misma mutación es el único rojo del árbol junto a los que se listan abajo.
+ *
+ * Uno guarda la CAUSA (que la estrategia esté registrada) y el otro el EFECTO (que el esquema
+ * cumpla la convención), y **ninguno sustituye al otro**: borrar este porque «ya lo cubre el
+ * unitario» dejaría entrar una migración con un `name: 'createdAt'` escrito a mano, que la
+ * estrategia no convierte y por diseño respeta.
+ *
+ * ## Las tablas nuevas entran solas en tres de los cuatro casos, y a mano en el cuarto
+ *
+ * Los casos de nombres recorren TODO `information_schema.columns`, así que un contexto nuevo queda
+ * cubierto sin tocar este archivo. El de la traza de auditoría lleva una lista escrita —es el
+ * precio de que `orders_outbox` quede fuera a propósito— y por eso `wallets` y `wallet_transfers`
+ * hubo que añadirlas. Que la lista no sea decorativa está medido: cambiando `'wallet_transfers'`
+ * por un nombre que no existe, ese caso se pone rojo nombrando sus cuatro columnas
+ * (`+ "wallet_transfers_typo.created_at"`, …). O sea que su verde prueba que las dos tablas están
+ * en la base y con las cuatro columnas, no solo que alguien escribió sus nombres aquí.
  */
 describe('convenciones del esquema (e2e)', () => {
   let app: INestApplication;
@@ -85,7 +109,11 @@ describe('convenciones del esquema (e2e)', () => {
   });
 
   describe('la traza de auditoría', () => {
-    it('debería estar completa en las tres tablas que llevan agregado', () => {
+    // Sin numeral en el título a propósito: decía «las tres tablas» y ya se quedó obsoleto una vez
+    // al entrar `wallets` y `wallet_transfers`. Un número en el nombre del caso no se pone rojo
+    // cuando deja de ser cierto — simplemente miente, que es el modo de fallo que este ciclo lleva
+    // cazando en comentarios. La cuenta la dice la lista de abajo, que es la que manda.
+    it('debería estar completa en todas las tablas que llevan agregado', () => {
       // Arrange
       const AUDIT = ['created_at', 'updated_at', 'created_by', 'updated_by'];
       const byTable = new Map<string, string[]>();
@@ -97,7 +125,13 @@ describe('convenciones del esquema (e2e)', () => {
       }
 
       // Act
-      const missing = ['users', 'auth_credentials', 'orders'].flatMap((table) =>
+      const missing = [
+        'users',
+        'auth_credentials',
+        'orders',
+        'wallets',
+        'wallet_transfers',
+      ].flatMap((table) =>
         AUDIT.filter((audit) => !byTable.get(table)?.includes(audit)).map(
           (audit) => `${table}.${audit}`,
         ),

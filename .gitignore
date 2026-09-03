@@ -73,3 +73,14 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Bundle de Scalar, generado por scripts/copy-scalar-asset.mjs
 /public/
+
+# Documentación del proveedor descargada para trabajar: NO es material de este repositorio y su
+# licencia no es nuestra, así que no se versiona.
+#
+# ⚠️ Consecuencia que hay que conocer: los comentarios del módulo `wallets` citan mediciones
+# hechas sobre `docs/tatum/gas-pump/openapi.json` —qué campos son índices, qué ejemplo trae el
+# hash, dónde interpola la clave el 401— y **quien clone el repo no puede reproducirlas** sin
+# volver a descargar esa documentación. Las citas son ciertas y están medidas; lo que no está es
+# la fuente. Versionar un extracto mínimo con solo los esquemas citados es la salida si eso
+# molesta, y es una decisión de licencia, no técnica.
+/docs/tatum

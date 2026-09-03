@@ -48,6 +48,22 @@ export const DEFAULT_REDACT_PATHS = [
   '*.accessToken',
   '*.apiKey',
   '*.secret',
+  // Las tres de la clave privada de la master (spec de wallets, §7.1). `privateKey` es el
+  // nombre genérico; `masterPrivateKey` es como la nombra la configuración; `fromPrivateKey`
+  // es como la nombra el CUERPO que Tatum exige, y por tanto la que aparecería si alguien
+  // logueara la petición. Las tres, y no una: la redacción casa por NOMBRE de propiedad, así
+  // que cada renombrado por el camino necesita su ruta.
+  //
+  // ⚠️ Cubren profundidad DOS —`err.fromPrivateKey`, `tatum.privateKey`— y no más: medido con
+  // pino 10.3.1 por el caso «debería NO tapar la clave anidada a un nivel más, que es el límite
+  // del comodín» de su spec, donde `err.request.fromPrivateKey` sale SIN tapar. Es la misma
+  // limitación que ya tienen `*.password` y compañía. Por eso la invariante que de verdad
+  // protege es que los errores del adaptador no lleven el cuerpo dentro
+  // (`src/modules/wallets/__tests__/infrastructure/gateways/tatum-secret-surface.spec.ts`), y
+  // esto es la red por debajo.
+  '*.privateKey',
+  '*.masterPrivateKey',
+  '*.fromPrivateKey',
   'err.parameters[*]',
 ];
 

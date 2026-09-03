@@ -174,7 +174,7 @@ export default tseslint.config(
         },
         {
           selector:
-            'ImportDeclaration[source.value=/(ports\\/|\\.module$)/] > ImportSpecifier[importKind="type"]:not([imported.name=/^(CreateProfileResult|DirectoryUser|FindUsersCriteria|SignedToken|TokenClaims|UserPage|UserSummary)$/])',
+            'ImportDeclaration[source.value=/(ports\\/|\\.module$)/] > ImportSpecifier[importKind="type"]:not([imported.name=/^(CreateProfileResult|DirectoryUser|FindTransfersCriteria|FindUsersCriteria|SendCommand|SignedToken|TokenClaims|TransferPage|UserPage|UserSummary|WalletSaveOutcome)$/])',
           message:
             'El `type` INLINE borra ese specifier del emit igual que `import type`: si el nombre es un puerto (`UserRepository`, `PasswordHasher`, `UsersFacade`…), Nest fallará EN RUNTIME con los gates en verde. Impórtalo como valor. Si de verdad es un DATO que acompaña al puerto y no algo inyectable, añádelo a la lista cerrada de este selector en `eslint.config.mjs`.',
         },

@@ -1,3 +1,5 @@
+import { PRODUCTION_LIKE_ENV } from '@test/helpers/config.factory';
+
 import { envSchema, splitList } from '../env.schema';
 
 describe('envSchema', () => {
@@ -14,6 +16,15 @@ describe('envSchema', () => {
       LOG_REDACT_FIELDS: 'password,token',
       TRUST_PROXY: 'loopback',
       DB_SSL_CA: '/etc/ssl/certs/rds.pem',
+      TATUM_API_URL: 'https://api.tatum.io',
+      WALLETS_NETWORK: 'testnet',
+      WALLETS_ACTIVATION_PAYER: 'tatum',
+      WALLETS_MASTER_ADDRESS: `0x${'a'.repeat(40)}`,
+      // Estas dos van definidas a propósito aunque sean opcionales: sin valor no aparecen en la
+      // salida y el filtro de abajo —que descarta `undefined`— nunca las miraría, así que las
+      // siete variables nuevas solo quedan cubiertas si las siete llegan con algo.
+      TATUM_API_KEY: 'test-api-key',
+      WALLETS_MASTER_PRIVATE_KEY: `0x${'0'.repeat(64)}`,
     };
 
     // Act
@@ -165,7 +176,16 @@ describe('envSchema', () => {
   describe('coerción numérica', () => {
     it('debería convertir a número los puertos y timeouts que llegan como string', () => {
       // Arrange
-      const raw = { PORT: '3000', REQUEST_TIMEOUT_MS: '5000', HEALTH_HEAP_LIMIT_MB: '512' };
+      // TATUM_TIMEOUT_MS no está aquí de adorno: su default son 10 000 ms y el refine del final
+      // de env.schema.ts exige que sea estrictamente menor que REQUEST_TIMEOUT_MS, así que
+      // bajar este a 5 000 sin bajar aquel deja el objeto entero inválido. Es el mismo aviso que
+      // recibirá quien acorte el corte global en un despliegue, y sale al arrancar.
+      const raw = {
+        PORT: '3000',
+        REQUEST_TIMEOUT_MS: '5000',
+        TATUM_TIMEOUT_MS: '4000',
+        HEALTH_HEAP_LIMIT_MB: '512',
+      };
 
       // Act
       const env = parseOrThrow(raw);
@@ -173,6 +193,7 @@ describe('envSchema', () => {
       // Assert
       expect(env.PORT).toBe(3000);
       expect(env.REQUEST_TIMEOUT_MS).toBe(5000);
+      expect(env.TATUM_TIMEOUT_MS).toBe(4000);
       expect(env.HEALTH_HEAP_LIMIT_MB).toBe(512);
     });
 
@@ -303,10 +324,10 @@ describe('envSchema', () => {
       'debería aceptar NODE_ENV="%s"',
       (value) => {
         // Arrange
-        // JWT_SECRET solo hace falta en staging/production — ver el refine de auth en
-        // env.schema.ts. Aquí lo que se comprueba es el enum de NODE_ENV, no eso.
-        const needsJwtSecret = value === 'staging' || value === 'production';
-        const raw = { NODE_ENV: value, ...(needsJwtSecret ? { JWT_SECRET: 'x'.repeat(32) } : {}) };
+        // `staging` y `production` exigen JWT_SECRET y las tres credenciales del proveedor —ver
+        // los refines de env.schema.ts—. Aquí lo que se comprueba es el enum de NODE_ENV, no eso.
+        const isProductionLike = value === 'staging' || value === 'production';
+        const raw = { NODE_ENV: value, ...(isProductionLike ? PRODUCTION_LIKE_ENV : {}) };
 
         // Act
         const env = parseOrThrow(raw);
@@ -354,6 +375,243 @@ describe('envSchema', () => {
       // middleware nunca se monta y la documentación sale publicada sin pedir nada.
       expect(result.success).toBe(false);
       expect(JSON.stringify(result.error?.issues)).toContain('DOCS_PASSWORD');
+    });
+  });
+
+  describe('wallets y proveedor custodial', () => {
+    it('debería aplicar los defaults del proveedor cuando no se define ninguna variable', () => {
+      // Arrange
+      const raw = {};
+
+      // Act
+      const env = parseOrThrow(raw);
+
+      // Assert
+      expect(env.TATUM_API_URL).toBe('https://api.tatum.io');
+      expect(env.TATUM_TIMEOUT_MS).toBe(10_000);
+      expect(env.WALLETS_ACTIVATION_PAYER).toBe('tatum');
+      expect(env.WALLETS_NETWORK).toBe('testnet');
+    });
+
+    it('debería dejar las tres credenciales indefinidas en development, sin default', () => {
+      // Arrange
+      const raw = { NODE_ENV: 'development' };
+
+      // Act
+      const env = parseOrThrow(raw);
+
+      // Assert
+      // El default depende de NODE_ENV y lo resuelve `resolveTatumCredentials()` en
+      // `src/config/wallets.config.ts`, igual que pasa con JWT_SECRET: aquí solo se comprueba
+      // que el schema no inventa uno.
+      expect(env.TATUM_API_KEY).toBeUndefined();
+      expect(env.WALLETS_MASTER_ADDRESS).toBeUndefined();
+      expect(env.WALLETS_MASTER_PRIVATE_KEY).toBeUndefined();
+    });
+
+    it('debería rechazar un TATUM_API_URL que no sea una URL', () => {
+      // Arrange
+      const raw = { TATUM_API_URL: 'api.tatum.io' };
+
+      // Act
+      const result = envSchema.safeParse(raw);
+
+      // Assert
+      expect(result.success).toBe(false);
+    });
+
+    it('debería aceptar un TATUM_API_URL de loopback, que es lo que usa el stub del E2E', () => {
+      // Arrange
+      const raw = { TATUM_API_URL: 'http://127.0.0.1:34567' };
+
+      // Act
+      const env = parseOrThrow(raw);
+
+      // Assert
+      expect(env.TATUM_API_URL).toBe('http://127.0.0.1:34567');
+    });
+
+    it('debería rechazar TATUM_TIMEOUT_MS presente pero vacía, en vez de coercionarla a 0', () => {
+      // Arrange
+      const raw = { TATUM_TIMEOUT_MS: '' };
+
+      // Act
+      const result = envSchema.safeParse(raw);
+
+      // Assert
+      expect(result.success).toBe(false);
+    });
+
+    it('debería rechazar una WALLETS_MASTER_ADDRESS que no sea 0x más 40 hexadecimales', () => {
+      // Arrange
+      const raw = { WALLETS_MASTER_ADDRESS: `0x${'a'.repeat(39)}` };
+
+      // Act
+      const result = envSchema.safeParse(raw);
+
+      // Assert
+      expect(result.success).toBe(false);
+    });
+
+    it('debería aceptar una WALLETS_MASTER_ADDRESS con mayúsculas, que es la forma EIP-55', () => {
+      // Arrange
+      const raw = { WALLETS_MASTER_ADDRESS: `0x${'A'.repeat(40)}` };
+
+      // Act
+      const env = parseOrThrow(raw);
+
+      // Assert
+      // Quien copia la dirección de un explorador la copia con checksum. Rechazarla aquí
+      // obligaría a pasarla a minúsculas a mano antes de escribir el `.env`.
+      expect(env.WALLETS_MASTER_ADDRESS).toBe(`0x${'A'.repeat(40)}`);
+    });
+
+    it('debería rechazar una WALLETS_MASTER_PRIVATE_KEY sin el prefijo 0x', () => {
+      // Arrange
+      const raw = { WALLETS_MASTER_PRIVATE_KEY: '0'.repeat(64) };
+
+      // Act
+      const result = envSchema.safeParse(raw);
+
+      // Assert
+      // `TransferCustodialWallet.fromPrivateKey` declara `minLength: 66` y `maxLength: 66` en
+      // `docs/tatum/gas-pump/openapi.json` — medido sobre el fichero. Sin prefijo son 64 y la
+      // llamada muere en el proveedor, con el mensaje del proveedor.
+      expect(result.success).toBe(false);
+    });
+
+    it('debería rechazar un WALLETS_ACTIVATION_PAYER que no sea tatum ni master', () => {
+      // Arrange
+      const raw = { WALLETS_ACTIVATION_PAYER: 'usuario' };
+
+      // Act
+      const result = envSchema.safeParse(raw);
+
+      // Assert
+      // Medido sobre `docs/tatum/gas-pump/openapi.json`: el `oneOf` de
+      // `POST /v3/gas-pump/activate` tiene siete cuerpos y solo tres aceptan `chain: ETH` —
+      // `ActivateGasPumpTatum` (`feesCovered`), `ActivateGasPump` (`fromPrivateKey`) y
+      // `ActivateGasPumpKMS` (`signatureId`). El tercero exige el KMS del proveedor, que el
+      // refine de WALLETS_NETWORK deja fuera de este ciclo. Un valor más no tiene cuerpo que
+      // construir.
+      expect(result.success).toBe(false);
+    });
+
+    it('debería aceptar WALLETS_ACTIVATION_PAYER=master, que paga el gas con la clave', () => {
+      // Arrange
+      const raw = { WALLETS_ACTIVATION_PAYER: 'master' };
+
+      // Act
+      const env = parseOrThrow(raw);
+
+      // Assert
+      expect(env.WALLETS_ACTIVATION_PAYER).toBe('master');
+    });
+
+    it.each(['staging', 'production'])(
+      'debería rechazar %s sin las credenciales del proveedor',
+      (nodeEnv) => {
+        // Arrange
+        const raw = { NODE_ENV: nodeEnv, JWT_SECRET: 'x'.repeat(32) };
+
+        // Act
+        const result = envSchema.safeParse(raw);
+
+        // Assert
+        expect(result.success).toBe(false);
+        expect(JSON.stringify(result.error?.issues)).toContain('WALLETS_MASTER_PRIVATE_KEY');
+      },
+    );
+
+    it.each(['staging', 'production'])(
+      'debería aceptar %s con las tres credenciales definidas',
+      (nodeEnv) => {
+        // Arrange
+        const raw = { NODE_ENV: nodeEnv, ...PRODUCTION_LIKE_ENV };
+
+        // Act
+        const result = envSchema.safeParse(raw);
+
+        // Assert
+        expect(result.success).toBe(true);
+      },
+    );
+
+    it('debería aceptar development sin ninguna credencial del proveedor', () => {
+      // Arrange
+      const raw = { NODE_ENV: 'development' };
+
+      // Act
+      const result = envSchema.safeParse(raw);
+
+      // Assert
+      // Levantar la API en local no puede exigir darse de alta en el proveedor: el refine solo
+      // alcanza a staging y production, y el resto del sistema arranca sin cuenta de Tatum.
+      expect(result.success).toBe(true);
+    });
+
+    it('debería rechazar WALLETS_NETWORK=mainnet nombrando el KMS como condición de salida', () => {
+      // Arrange
+      const raw = { WALLETS_NETWORK: 'mainnet' };
+
+      // Act
+      const result = envSchema.safeParse(raw);
+
+      // Assert
+      // El enum ACEPTA `mainnet` y es el refine quien lo veta, a propósito: con
+      // `z.enum(['testnet'])` el arranque diría `Invalid input: expected "testnet"` —medido con
+      // zod 4.4.3— y quien lo leyera no sabría si es un veto nuestro o una errata.
+      expect(result.success).toBe(false);
+      expect(JSON.stringify(result.error?.issues)).toContain('KMS');
+    });
+
+    it('debería aceptar WALLETS_NETWORK=testnet', () => {
+      // Arrange
+      const raw = { WALLETS_NETWORK: 'testnet' };
+
+      // Act
+      const env = parseOrThrow(raw);
+
+      // Assert
+      expect(env.WALLETS_NETWORK).toBe('testnet');
+    });
+
+    it('debería rechazar TATUM_TIMEOUT_MS igual a REQUEST_TIMEOUT_MS', () => {
+      // Arrange
+      const raw = { TATUM_TIMEOUT_MS: '15000', REQUEST_TIMEOUT_MS: '15000' };
+
+      // Act
+      const result = envSchema.safeParse(raw);
+
+      // Assert
+      // El caso del empate es el que de verdad prueba el `<` estricto: con `<=` pasaría, y una
+      // carrera entre los dos temporizadores es exactamente lo que no se quiere.
+      expect(result.success).toBe(false);
+    });
+
+    it('debería rechazar TATUM_TIMEOUT_MS mayor que REQUEST_TIMEOUT_MS', () => {
+      // Arrange
+      const raw = { TATUM_TIMEOUT_MS: '20000', REQUEST_TIMEOUT_MS: '15000' };
+
+      // Act
+      const result = envSchema.safeParse(raw);
+
+      // Assert
+      // Con el corte global por delante, el interceptor responde 408 y la fila del libro se
+      // queda en `submitting` con la llamada al proveedor todavía en vuelo.
+      expect(result.success).toBe(false);
+      expect(JSON.stringify(result.error?.issues)).toContain('TATUM_TIMEOUT_MS');
+    });
+
+    it('debería aceptar TATUM_TIMEOUT_MS estrictamente menor que REQUEST_TIMEOUT_MS', () => {
+      // Arrange
+      const raw = { TATUM_TIMEOUT_MS: '14999', REQUEST_TIMEOUT_MS: '15000' };
+
+      // Act
+      const env = parseOrThrow(raw);
+
+      // Assert
+      expect(env.TATUM_TIMEOUT_MS).toBe(14_999);
     });
   });
 });

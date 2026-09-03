@@ -56,9 +56,17 @@ export const expectedErrorName = (status: number): string =>
  * - `openapi-contract.e2e-spec.ts` comprueba que **todo** status de error publicado en el
  *   documento está aquí, así que documentar un 422 nuevo pone el guardián en rojo hasta que
  *   alguien lo contraste contra el filtro.
+ *
+ * ⚠️ **Estar aquí es una promesa sobre la FORMA del cuerpo, no sobre el status a secas.** El 502 y
+ * el 503 entran con `wallets`, cuyo filtro de dominio los construye con un STRING fijo
+ * (`wallets-domain-exception.filter.ts`), que es lo que hace que su cuerpo cumpla `ErrorPayload` y
+ * su `error` sea el canónico. Eso **no** rehabilita el 503 de `/health`: ahí Terminus lanza
+ * `ServiceUnavailableException(result)` con un OBJETO, así que su `error` es el mapa de indicadores
+ * caídos en vez de un string. A ese lo exime `KNOWN_ERROR_SHAPE_ANOMALIES`, en
+ * `openapi-contract.e2e-spec.ts`, y esa exención sigue vigente y es independiente de este conjunto.
  */
 export const VERIFIED_ERROR_STATUSES: ReadonlySet<number> = new Set([
-  400, 401, 403, 404, 409, 429, 500,
+  400, 401, 403, 404, 409, 429, 500, 502, 503,
 ]);
 
 export type ErrorExampleOptions = {

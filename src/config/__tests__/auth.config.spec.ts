@@ -1,3 +1,5 @@
+import { PRODUCTION_LIKE_WALLETS_ENV } from '@test/helpers/config.factory';
+
 import { resolveJwtSecret, ARGON2_PARAMS } from '../auth.config';
 import { envSchema } from '../env.schema';
 
@@ -34,10 +36,18 @@ describe('resolveJwtSecret', () => {
 
 describe('envSchema (auth)', () => {
   it.each(['staging', 'production'] as const)('debería rechazar %s sin JWT_SECRET', (nodeEnv) => {
-    // Arrange + Act
-    const result = envSchema.safeParse({ NODE_ENV: nodeEnv });
+    // Arrange
+    // Las credenciales del proveedor van puestas para que el ÚNICO motivo de rechazo sea el que
+    // este caso nombra. Sin ellas seguiría en verde, pero por el refine de wallets: un test que
+    // pasa por el motivo equivocado deja de proteger lo que dice proteger.
+    const raw = { NODE_ENV: nodeEnv, ...PRODUCTION_LIKE_WALLETS_ENV };
+
+    // Act
+    const result = envSchema.safeParse(raw);
+
     // Assert
     expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('JWT_SECRET');
   });
 
   it('debería aceptar development sin JWT_SECRET', () => {

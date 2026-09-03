@@ -105,6 +105,43 @@
  * El umbral se queda en 85 por el mismo criterio de siempre: subirlo a cuenta de un kernel que
  * nace con casos frescos premiaría el momento, no la disciplina.
  *
+ * Remedición del 2026-08-31 (ciclo de `wallets`, el bounded context de las direcciones
+ * custodiadas): **97.17 %** — 668 killed, 19 timeout, 20 survived, 0 sin cobertura, 35 error.
+ * 742 mutantes generados, **707 válidos** (los `error` salen de numerador y denominador) y 687
+ * detectados. Sube 4.4 puntos y el censo **más que dobla**: de 320 a 707 válidos.
+ *
+ * Reparto, con lo que de verdad importa, que es el PESO en mutantes y no el porcentaje:
+ *
+ *     wallets   99.73 %   364/365   51.6 % del censo
+ *     users     94.30 %   149/158   22.3 %
+ *     shared    97.56 %    61/63    11.6 %
+ *     auth      98.11 %    52/53     7.5 %
+ *     orders    85.71 %    42/49     6.9 %
+ *
+ * ⚠️ **Esta remedición invalida la aritmética del margen de los párrafos de abajo, y ese es su
+ * dato más importante.** El umbral exige ≥ 85 % de 707 = 601 detectados, así que la holgura es
+ * de **86 detecciones** —no las 24 sobre las que razonaba la entrada de 2026-08-19—. Con esa
+ * holgura, ni `orders` (49 válidos), ni `auth` (53), ni `shared` (63) pueden tumbar el global
+ * ellos solos aunque cayeran a cero. **Solo `users` y `wallets` pueden.**
+ *
+ * O sea: la amenaza al umbral se ha mudado. Ya no es `orders`, que sigue siendo el score más
+ * bajo (85.71 %) y sigue siendo el espejismo contra el que avisa este archivo —aislado parece
+ * estar a 0.71 puntos del umbral; en el global sobran 12.17—. Ahora es una regresión en el
+ * módulo NUEVO, que pesa la mitad del censo él solo.
+ *
+ * ⚠️ **Los 19 timeout de esta corrida NO son un censo limpio.** Aparecieron todos en
+ * `shared/domain/value-object.base.ts` mientras la máquina corría otros comandos en paralelo:
+ * es el basculamiento Killed↔Timeout que este archivo ya documenta como sensible a la carga. No
+ * mueve el score —Stryker cuenta el timeout como detectado— pero no debe citarse como estable.
+ *
+ * ⚠️ Y los 35 `error`: 17 son del dominio de `wallets` y tienen entrada propia en
+ * `docs/backlog.md` #17 con su causa medida —un mutante que hace que un `from()` rechace un
+ * valor válido revienta el spec al importarlo, porque construye value objects a nivel de módulo,
+ * y Stryker no puede atribuir la muerte a ningún caso—. No es un agujero: el mutante se detecta,
+ * la suite se pone roja. Es señal perdida, no cobertura perdida.
+ *
+ * El umbral se queda en 85.
+ *
  * Remedición del 2026-08-07 (ciclo 4, `auth` como bounded context propio con la credencial):
  * **92.78 %** — 257 killed, 0 timeout, 20 survived, 0 sin cobertura, 8 error (257/277). Sube
  * 1.3 puntos y el censo CRECE por primera vez en el refactor: +54 mutantes válidos, todos del

@@ -34,6 +34,13 @@ const config = {
   collectCoverageFrom: [
     'src/**/*.module.ts',
     'src/**/*.typeorm.repository.ts',
+    // Entra el 2026-08-31 con `sequence-address-index.allocator.e2e-spec.ts`. Mismo caso que un
+    // repositorio TypeORM: el sujeto es una secuencia del motor y su prueba no puede vivir en la
+    // suite unitaria. El patrón es el ESPEJO EXACTO del `!src/**/infrastructure/**/*.allocator.ts`
+    // de `jest.config.mjs` —`infrastructure/` incluido— para que el puerto
+    // `domain/ports/address-index.allocator.ts` siga midiéndose allí y solo allí; el razonamiento,
+    // con la medición, está en aquel archivo.
+    'src/**/infrastructure/**/*.allocator.ts',
     'src/database/data-source.ts',
     'src/database/seeds/**',
     'src/database/outbox/**',
@@ -44,7 +51,10 @@ const config = {
     '!src/**/__tests__/**',
   ],
   coverageDirectory: 'coverage-e2e',
-  coverageReporters: ['text', 'lcov'],
+  // `json-summary` se añade el 2026-08-31 para poder REMEDIR los umbrales sin leer a ojo la tabla
+  // de texto: las remediciones de abajo se calculan sobre `coverage-e2e/coverage-summary.json`.
+  // `text` y `lcov` se quedan: uno es lo que se ve en CI y el otro lo que consume el informe.
+  coverageReporters: ['text', 'lcov', 'json-summary'],
   // `branches: 30` — mismo fenómeno que documenta `jest.config.mjs` para la unitaria, pero
   // aquí la desproporción es extrema y está medida (2026-08-06, lcov de esta suite): de las
   // 130 ramas del scope, 106 son sintéticas de los helpers de decoradores de SWC — los cinco
@@ -76,8 +86,43 @@ const config = {
   // Los números más bajos del informe siguen siendo los mismos y siguen por encima:
   // `relay-orders-outbox.ts` 64.70 %, `data-source.ts` 33.33 % de funciones (solo la CLI ejecuta
   // el resto) y `seed-admin.ts` 82.25 %.
+  //
+  // **Remedido el 2026-08-31**, al entrar en el scope los dos repositorios TypeORM de `wallets` y
+  // `sequence-address-index.allocator.ts`:
+  //
+  //     statements  87.65  (suelo 84)      branches  42.43  (suelo 38)
+  //     functions   93.79  (suelo 88)      lines     90.48  (suelo 87)
+  //
+  // Los cuatro suelos se quedan como están: los cuatro pasan con 3.5-5.8 puntos de margen, que es
+  // el criterio de arriba. Subirlos a ras del número de hoy convertiría en CI roja el primer
+  // adaptador nuevo que entre sin E2E propio, y esa es la vía rápida a que alguien los baje sin
+  // mirar. El archivo más bajo del bloque nuevo es `sequence-address-index.allocator.ts`, 82.60 %
+  // de statements, y lo que reporta sin cubrir son las líneas 19-21 — que están DENTRO de su
+  // bloque JSDoc, o sea que no son código. Es el mismo artefacto de la instrumentación de SWC que
+  // enseñan los otros tres adaptadores del informe (21-23, 22-24, 23-25, también dentro de su
+  // JSDoc): no hay ninguna rama de `next()` sin ejercitar.
+  //
+  // **Remedido otra vez el 2026-08-31**, esta vez con `wallets.e2e-spec.ts` y los cinco escenarios
+  // de `wallets` del guardián de contrato en ejecución dentro de la suite. El scope NO cambia
+  // —`collectCoverageFrom` es el mismo—: lo que cambia es que `wallets.module.ts`, los dos
+  // repositorios TypeORM del contexto, el asignador y la migración `create-wallets` se ejercitan
+  // ahora por HTTP de verdad y no solo por sus specs de adaptador. Leído de
+  // `coverage-e2e/coverage-summary.json`, que es a lo que se añadió `json-summary`:
+  //
+  //     statements  87.76  (suelo 84)      branches  41.64  (suelo 38)
+  //     functions   93.89  (suelo 90)      lines     90.55  (suelo 87)
+  //
+  // Sube solo el suelo de `functions`, de 88 a 90, con los mismos 3 puntos de margen; los otros
+  // tres se quedan porque el calculado coincide con el vigente y los suelos solo suben.
+  //
+  // ⚠️ **`branches` BAJA 0.79 puntos respecto a la remedición anterior (42.43 -> 41.64), y no he
+  // atribuido la bajada a ningún archivo concreto.** Que pueda bajar mientras la suite CRECE no es
+  // una anomalía: el denominador está dominado por las ramas sintéticas que SWC emite para los
+  // decoradores —el párrafo de 2026-08-06 de aquí arriba las midió, 106 de 130—, así que un
+  // proveedor más en un `*.module.ts` suma ramas sin sumar cubiertas. Lo que sí está medido es el
+  // dato: 162 ramas cubiertas de 389, con 3.64 puntos por encima del suelo de 38, que se queda.
   coverageThreshold: {
-    global: { branches: 38, functions: 88, lines: 87, statements: 84 },
+    global: { branches: 38, functions: 90, lines: 87, statements: 84 },
   },
 };
 

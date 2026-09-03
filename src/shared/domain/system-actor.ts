@@ -37,6 +37,21 @@ export const SYSTEM_ACTORS = {
   ADMIN_SEED: `${SYSTEM_ACTOR_PREFIX}admin-seed`,
   /** `pnpm outbox:relay`. Reservado: hoy el relay solo marca `processed_at`, sin traza. */
   OUTBOX_RELAY: `${SYSTEM_ACTOR_PREFIX}outbox-relay`,
+  /**
+   * Curación perezosa de la activación de una gas pump address (`wallets`, spec §5.4): el
+   * proveedor dice que la dirección ya puede enviar y nuestra fila seguía en `receive-only` o
+   * `activating`, así que pasa a `active` sin que nadie lo haya pedido.
+   *
+   * ⚠️ **NO se atribuye al dueño que hizo la petición.** Él no activó nada: su transacción de
+   * activación se perdió o la respuesta no llegó, y quien decide el cambio es la reconciliación.
+   * Ponerle su id dejaría la traza afirmando que activó una wallet que ya estaba activada por un
+   * intento anterior — y esa traza es lo único que queda para reconstruir qué pasó en el fallo
+   * parcial que esta curación existe para tapar.
+   *
+   * Es el `by` que recibe `Wallet.confirmActivated(now, by)` cuando quien la llama es la
+   * reconciliación, y no cuando la llama el camino normal de una activación que sí pidió alguien.
+   */
+  ACTIVATION_RECONCILIATION: `${SYSTEM_ACTOR_PREFIX}activation-reconciliation`,
 } as const;
 
 export type SystemActor = (typeof SYSTEM_ACTORS)[keyof typeof SYSTEM_ACTORS];
